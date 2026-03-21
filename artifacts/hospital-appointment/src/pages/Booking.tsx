@@ -76,7 +76,7 @@ export default function Booking() {
         queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
         setLocation("/dashboard");
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast({
           variant: "destructive",
           title: "Booking Failed",

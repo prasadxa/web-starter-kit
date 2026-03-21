@@ -142,6 +142,11 @@ router.post("/doctors", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+  const role = req.user.role;
+  if (role !== "super_admin" && role !== "hospital_admin") {
+    res.status(403).json({ error: "Only admin users can create doctors" });
+    return;
+  }
   const parsed = CreateDoctorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });
@@ -235,6 +240,16 @@ router.patch("/doctors/:id", async (req: Request, res: Response) => {
     return;
   }
   const id = parseInt(String(req.params.id));
+  const role = req.user.role;
+  const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
+  const canEdit =
+    role === "super_admin" ||
+    (role === "hospital_admin") ||
+    isOwnDoctor;
+  if (!canEdit) {
+    res.status(403).json({ error: "Forbidden: insufficient permissions" });
+    return;
+  }
   const parsed = UpdateDoctorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });
@@ -307,6 +322,16 @@ router.post("/doctors/:id/availability", async (req: Request, res: Response) => 
     return;
   }
   const id = parseInt(String(req.params.id));
+  const role = req.user.role;
+  const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
+  const canManage =
+    role === "super_admin" ||
+    role === "hospital_admin" ||
+    isOwnDoctor;
+  if (!canManage) {
+    res.status(403).json({ error: "Forbidden: cannot manage this doctor's availability" });
+    return;
+  }
   const parsed = SetDoctorAvailabilityBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });

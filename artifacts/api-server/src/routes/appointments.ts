@@ -140,18 +140,28 @@ router.post("/appointments", async (req: Request, res: Response) => {
     return;
   }
 
-  const [appointment] = await db
-    .insert(appointmentsTable)
-    .values({
-      patientId: req.user.id,
-      doctorId,
-      hospitalId,
-      date,
-      timeSlot,
-      notes: notes ?? null,
-      status: "booked",
-    })
-    .returning();
+  let appointment;
+  try {
+    [appointment] = await db
+      .insert(appointmentsTable)
+      .values({
+        patientId: req.user.id,
+        doctorId,
+        hospitalId,
+        date,
+        timeSlot,
+        notes: notes ?? null,
+        status: "booked",
+      })
+      .returning();
+  } catch (err: unknown) {
+    const pgErr = err as { code?: string };
+    if (pgErr?.code === "23505") {
+      res.status(409).json({ error: "This time slot is already booked" });
+      return;
+    }
+    throw err;
+  }
 
   res.status(201).json(appointment);
 });
@@ -229,14 +239,25 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
 
   const userId = req.user.id;
   const role = req.user.role;
-  const canEdit =
-    role === "super_admin" ||
-    (role === "patient" && existing.patientId === userId) ||
-    (role === "doctor" && req.user.doctorId === existing.doctorId) ||
-    (role === "hospital_admin" && req.user.hospitalId === existing.hospitalId);
+  const isPatientOwner = role === "patient" && existing.patientId === userId;
+  const isDoctorOwner = role === "doctor" && req.user.doctorId === existing.doctorId;
+  const isHospitalAdmin = role === "hospital_admin" && req.user.hospitalId === existing.hospitalId;
+  const isSuperAdmin = role === "super_admin";
+  const canEdit = isSuperAdmin || isPatientOwner || isDoctorOwner || isHospitalAdmin;
   if (!canEdit) {
     res.status(403).json({ error: "Forbidden" });
     return;
+  }
+
+  if (parsed.data.status !== undefined) {
+    if (isPatientOwner && parsed.data.status !== "cancelled") {
+      res.status(403).json({ error: "Patients can only cancel appointments" });
+      return;
+    }
+    if (isDoctorOwner && !["booked", "completed", "cancelled"].includes(parsed.data.status)) {
+      res.status(403).json({ error: "Invalid status transition" });
+      return;
+    }
   }
 
   if (parsed.data.date && parsed.data.timeSlot && parsed.data.date !== existing.date || parsed.data.timeSlot !== existing.timeSlot) {

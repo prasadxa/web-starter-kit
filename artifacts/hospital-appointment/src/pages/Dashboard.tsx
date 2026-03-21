@@ -21,7 +21,9 @@ import {
   useGetDoctors,
   getGetAppointmentsQueryKey,
   getGetAdminAnalyticsQueryKey,
-  getGetHospitalsQueryKey
+  getGetHospitalsQueryKey,
+  type Doctor,
+  type AppointmentDetail,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
@@ -80,7 +82,7 @@ function PatientDashboard() {
     });
   };
 
-  const ReviewDialog = ({ appointmentId, doctorId, doctorName }: any) => {
+  const ReviewDialog = ({ appointmentId, doctorId, doctorName }: { appointmentId: number; doctorId: number; doctorName: string | null }) => {
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
     const [open, setOpen] = useState(false);
@@ -168,7 +170,7 @@ function PatientDashboard() {
             </div>
             <div>
               {appt.status === 'completed' && !appt.hasReview && (
-                <ReviewDialog appointmentId={appt.id} doctorId={appt.doctorId} doctorName={appt.doctorLastName} />
+                <ReviewDialog appointmentId={appt.id} doctorId={appt.doctorId} doctorName={appt.doctorLastName ?? null} />
               )}
             </div>
           </div>
@@ -370,7 +372,7 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
   const upcomingAppts = appointments.filter(a => a.status === 'booked' || a.status === 'pending');
   const completedAppts = appointments.filter(a => a.status === 'completed');
   const cancelledAppts = appointments.filter(a => a.status === 'cancelled');
-  const doctors = (doctorsData as any)?.doctors ?? [];
+  const doctors: Doctor[] = doctorsData?.doctors ?? [];
 
   const stats = [
     { label: "Total Doctors", value: doctors.length, icon: <UserPlus className="w-5 h-5 text-primary" /> },
@@ -454,7 +456,7 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
               <p className="text-muted-foreground">No doctors assigned to your hospital yet.</p>
             </div>
           )}
-          {doctors.map((doc: any) => (
+          {doctors.map((doc: Doctor) => (
             <div key={doc.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm flex justify-between items-center gap-4">
               <div className="flex gap-4 items-center">
                 <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-lg shrink-0">

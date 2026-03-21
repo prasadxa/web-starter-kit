@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, date, timestamp, pgEnum, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, date, timestamp, pgEnum, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { sql } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -17,7 +17,7 @@ export const appointmentsTable = pgTable("appointments", {
   hasReview: boolean("has_review").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
-  index("appointments_no_double_book_idx").on(table.doctorId, table.date, table.timeSlot).where(sql`${table.status} = 'booked'`),
+  uniqueIndex("appointments_no_double_book_idx").on(table.doctorId, table.date, table.timeSlot).where(sql`${table.status} = 'booked'`),
 ]);
 
 export const insertAppointmentSchema = createInsertSchema(appointmentsTable).omit({ id: true, createdAt: true, hasReview: true });

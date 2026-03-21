@@ -48,9 +48,29 @@ router.patch("/users/profile", async (req: Request, res: Response) => {
     return;
   }
 
+  const currentRole = req.user.role;
   const updateData: Partial<typeof usersTable.$inferInsert> = {};
-  if (parsed.data.role) updateData.role = parsed.data.role;
-  if (parsed.data.hospitalId !== undefined) updateData.hospitalId = parsed.data.hospitalId;
+
+  if (parsed.data.role !== undefined) {
+    if (currentRole !== "super_admin") {
+      res.status(403).json({ error: "Only super_admin can change roles" });
+      return;
+    }
+    updateData.role = parsed.data.role;
+  }
+
+  if (parsed.data.hospitalId !== undefined) {
+    if (currentRole !== "super_admin" && currentRole !== "hospital_admin") {
+      res.status(403).json({ error: "Only admin users can change hospitalId" });
+      return;
+    }
+    updateData.hospitalId = parsed.data.hospitalId;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    res.status(400).json({ error: "No updatable fields provided" });
+    return;
+  }
 
   const [updated] = await db
     .update(usersTable)

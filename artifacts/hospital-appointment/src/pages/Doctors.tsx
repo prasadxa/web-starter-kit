@@ -90,7 +90,7 @@ export default function Doctors() {
 
               <div className="space-y-3">
                 <Label className="text-sm font-semibold text-muted-foreground">Sort By</Label>
-                <Select value={sort} onValueChange={(v: any) => setSort(v)}>
+                <Select value={sort} onValueChange={(v) => setSort(v as "score" | "rating" | "availability")}>
                   <SelectTrigger className="w-full rounded-xl bg-background border-border/60">
                     <SelectValue />
                   </SelectTrigger>
