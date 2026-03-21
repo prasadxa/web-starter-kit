@@ -1,0 +1,245 @@
+Build a FULL-STACK production-level web application for a "Multi-Hospital Online Doctor Appointment System".
+
+TECH STACK:
+- Frontend: React.js with Tailwind CSS (modern UI, responsive)
+- Backend: Django + Django REST Framework
+- Database: PostgreSQL
+- Authentication: JWT (JSON Web Tokens)
+- Use clean architecture and scalable folder structure
+
+--------------------------------------------------
+
+PROJECT OVERVIEW:
+
+This platform allows multiple hospitals to register and manage doctors, and allows patients to book appointments.
+
+The patient flow must follow this STRICT sequence:
+
+1. Select Hospital (optional)
+2. Select Department (MANDATORY)
+3. View Doctors (filtered by department)
+4. Doctors sorted by:
+   - Highest rating first
+   - Highest number of reviews
+   - Availability
+5. Select Doctor
+6. View Doctor Profile (with reviews)
+7. Book Appointment
+
+--------------------------------------------------
+
+USER ROLES:
+
+1. Patient
+2. Doctor
+3. Hospital Admin
+4. Super Admin (platform owner)
+
+--------------------------------------------------
+
+FEATURES:
+
+PATIENT:
+- Register/Login (JWT आधारित authentication)
+- Select department (Cardiology, Dermatology, etc.)
+- View doctors based on department
+- Filter and sort doctors:
+  - Top rated
+  - Most reviewed
+  - Available today
+- View doctor profile:
+  - Experience
+  - Hospital
+  - Reviews
+  - Ratings
+- Book appointment (date + time slot)
+- Cancel/reschedule appointment
+- Submit review after appointment
+
+DOCTOR:
+- Login
+- Set availability (time slots)
+- View appointments
+- Accept/reject appointments
+
+HOSPITAL ADMIN:
+- Register hospital
+- Add/manage doctors
+- Manage departments
+- View all appointments
+
+SUPER ADMIN:
+- Approve hospitals
+- View analytics dashboard
+
+--------------------------------------------------
+
+DATABASE DESIGN:
+
+Create PostgreSQL models:
+
+Users:
+- id
+- name
+- email
+- password
+- role (patient, doctor, admin)
+
+Hospitals:
+- id
+- name
+- location
+- approved (boolean)
+
+Departments:
+- id
+- name (Cardiology, etc.)
+
+Doctors:
+- id
+- user_id
+- hospital_id
+- department_id
+- experience
+- consultation_fee
+- average_rating (float)
+- total_reviews (int)
+
+Appointments:
+- id
+- patient_id
+- doctor_id
+- hospital_id
+- date
+- time_slot
+- status (booked, cancelled, completed)
+
+Availability:
+- id
+- doctor_id
+- date
+- time_slots (array)
+
+Reviews:
+- id
+- patient_id
+- doctor_id
+- rating (1-5)
+- comment
+- created_at
+
+--------------------------------------------------
+
+IMPORTANT LOGIC:
+
+1. Prevent double booking of same time slot
+
+2. Doctor ranking algorithm:
+score = (rating * 0.6) + (log(review_count) * 0.3) + (availability * 0.1)
+
+3. Update doctor’s average_rating and total_reviews after each review
+
+--------------------------------------------------
+
+API ENDPOINTS:
+
+Auth:
+POST /api/auth/register
+POST /api/auth/login
+
+Departments:
+GET /api/departments
+
+Doctors:
+GET /api/doctors?department=<id>&sort=rating
+GET /api/doctors/<id>
+GET /api/doctors/<id>/reviews
+
+Appointments:
+POST /api/appointments
+GET /api/appointments
+PUT /api/appointments/<id>
+
+Reviews:
+POST /api/reviews
+
+Hospitals:
+GET /api/hospitals
+POST /api/hospitals
+
+--------------------------------------------------
+
+FRONTEND REQUIREMENTS (React):
+
+Pages:
+- Home Page
+- Department Selection Page
+- Doctor Listing Page
+- Doctor Profile Page
+- Booking Page
+- Patient Dashboard
+- Admin Dashboard
+
+UI REQUIREMENTS:
+- Clean modern UI (like Practo)
+- Responsive (mobile + desktop)
+- Use cards for doctors
+- Show:
+  - Rating ⭐
+  - Review count
+  - Next available slot
+- Add "Top Rated" badge
+
+--------------------------------------------------
+
+EXTRA FEATURES:
+
+- Email confirmation after booking
+- Pagination for doctors list
+- Search functionality
+- Filter by price, rating, availability
+
+--------------------------------------------------
+
+PROJECT STRUCTURE:
+
+Frontend:
+- components/
+- pages/
+- services/api.js
+- hooks/
+
+Backend:
+- apps/
+  - users/
+  - doctors/
+  - hospitals/
+  - appointments/
+- serializers/
+- views/
+- urls/
+
+--------------------------------------------------
+
+DEPLOYMENT:
+
+- Backend: Deploy using Railway or Render
+- Frontend: Deploy using Vercel
+- Use environment variables for secrets
+
+--------------------------------------------------
+
+FINAL INSTRUCTIONS:
+
+- Write clean, modular, production-ready code
+- Add comments where necessary
+- Ensure API integration works with frontend
+- Include sample data (seed data)
+- Ensure proper error handling
+- Use best practices for security
+
+--------------------------------------------------
+
+GOAL:
+
+The final product should look and function like a simplified version of Practo, with department-first doctor selection and review-based ranking.
