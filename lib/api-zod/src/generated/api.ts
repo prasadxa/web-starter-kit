@@ -532,7 +532,7 @@ export const createReviewBodyRatingMax = 5;
 
 export const CreateReviewBody = zod.object({
   doctorId: zod.number(),
-  appointmentId: zod.number().optional(),
+  appointmentId: zod.number(),
   rating: zod.number().min(1).max(createReviewBodyRatingMax),
   comment: zod.string().optional(),
 });

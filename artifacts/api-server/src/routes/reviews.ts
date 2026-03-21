@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, reviewsTable, doctorsTable, appointmentsTable, usersTable } from "@workspace/db";
 import { CreateReviewBody } from "@workspace/api-zod";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -24,53 +24,40 @@ router.post("/reviews", async (req: Request, res: Response) => {
 
   const { doctorId, appointmentId, rating, comment } = parsed.data;
 
-  if (appointmentId) {
-    const [appt] = await db
-      .select()
-      .from(appointmentsTable)
-      .where(eq(appointmentsTable.id, appointmentId))
-      .limit(1);
+  if (!appointmentId) {
+    res.status(400).json({ error: "appointmentId is required to submit a review" });
+    return;
+  }
 
-    if (!appt) {
-      res.status(404).json({ error: "Appointment not found" });
-      return;
-    }
+  const [appt] = await db
+    .select()
+    .from(appointmentsTable)
+    .where(eq(appointmentsTable.id, appointmentId))
+    .limit(1);
 
-    if (appt.patientId !== req.user.id) {
-      res.status(403).json({ error: "You can only review your own appointments" });
-      return;
-    }
+  if (!appt) {
+    res.status(404).json({ error: "Appointment not found" });
+    return;
+  }
 
-    if (appt.doctorId !== doctorId) {
-      res.status(400).json({ error: "Appointment does not match the specified doctor" });
-      return;
-    }
+  if (appt.patientId !== req.user.id) {
+    res.status(403).json({ error: "You can only review your own appointments" });
+    return;
+  }
 
-    if (appt.status !== "completed") {
-      res.status(400).json({ error: "You can only review completed appointments" });
-      return;
-    }
+  if (appt.doctorId !== doctorId) {
+    res.status(400).json({ error: "Appointment does not match the specified doctor" });
+    return;
+  }
 
-    if (appt.hasReview) {
-      res.status(409).json({ error: "Review already submitted for this appointment" });
-      return;
-    }
-  } else {
-    const existingReview = await db
-      .select()
-      .from(reviewsTable)
-      .where(
-        and(
-          eq(reviewsTable.patientId, req.user.id),
-          eq(reviewsTable.doctorId, doctorId),
-        )
-      )
-      .limit(1);
+  if (appt.status !== "completed") {
+    res.status(400).json({ error: "You can only review completed appointments" });
+    return;
+  }
 
-    if (existingReview.length > 0) {
-      res.status(409).json({ error: "You have already reviewed this doctor" });
-      return;
-    }
+  if (appt.hasReview) {
+    res.status(409).json({ error: "Review already submitted for this appointment" });
+    return;
   }
 
   const [review] = await db
@@ -78,18 +65,16 @@ router.post("/reviews", async (req: Request, res: Response) => {
     .values({
       patientId: req.user.id,
       doctorId,
-      appointmentId: appointmentId ?? null,
+      appointmentId,
       rating,
       comment: comment ?? null,
     })
     .returning();
 
-  if (appointmentId) {
-    await db
-      .update(appointmentsTable)
-      .set({ hasReview: true })
-      .where(eq(appointmentsTable.id, appointmentId));
-  }
+  await db
+    .update(appointmentsTable)
+    .set({ hasReview: true })
+    .where(eq(appointmentsTable.id, appointmentId));
 
   const [stats] = await db
     .select({

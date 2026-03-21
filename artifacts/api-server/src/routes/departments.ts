@@ -15,8 +15,8 @@ router.post("/departments", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (req.user.role !== "super_admin") {
-    res.status(403).json({ error: "Only super_admin can create departments" });
+  if (req.user.role !== "super_admin" && req.user.role !== "hospital_admin") {
+    res.status(403).json({ error: "Only super_admin or hospital_admin can create departments" });
     return;
   }
   const parsed = CreateDepartmentBody.safeParse(req.body);

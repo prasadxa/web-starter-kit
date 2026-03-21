@@ -329,7 +329,7 @@ export interface ReviewListResponse {
 
 export interface CreateReviewBody {
   doctorId: number;
-  appointmentId?: number;
+  appointmentId: number;
   /**
    * @minimum 1
    * @maximum 5

@@ -1234,7 +1234,7 @@ components:
 
     CreateReviewBody:
       type: object
-      required: [doctorId, rating]
+      required: [doctorId, appointmentId, rating]
       properties:
         doctorId:
           type: integer
