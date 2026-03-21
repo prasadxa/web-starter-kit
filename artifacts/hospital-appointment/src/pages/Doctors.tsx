@@ -22,7 +22,7 @@ export default function Doctors() {
 
   const [search, setSearch] = useState(initialSearch);
   const [departmentId, setDepartmentId] = useState<string>(initialDept);
-  const [sort, setSort] = useState<"score" | "rating" | "availability">("score");
+  const [sort, setSort] = useState<"score" | "rating" | "reviews" | "availability">("score");
 
   useEffect(() => {
     if (searchParams) {
@@ -90,13 +90,14 @@ export default function Doctors() {
 
               <div className="space-y-3">
                 <Label className="text-sm font-semibold text-muted-foreground">Sort By</Label>
-                <Select value={sort} onValueChange={(v) => setSort(v as "score" | "rating" | "availability")}>
+                <Select value={sort} onValueChange={(v) => setSort(v as "score" | "rating" | "reviews" | "availability")}>
                   <SelectTrigger className="w-full rounded-xl bg-background border-border/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="score">Recommended</SelectItem>
                     <SelectItem value="rating">Highest Rated</SelectItem>
+                    <SelectItem value="reviews">Most Reviewed</SelectItem>
                     <SelectItem value="availability">Earliest Available</SelectItem>
                   </SelectContent>
                 </Select>

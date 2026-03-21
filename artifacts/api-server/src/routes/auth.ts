@@ -96,6 +96,14 @@ router.get("/auth/user", (req: Request, res: Response) => {
   );
 });
 
+router.get("/auth/me", (req: Request, res: Response) => {
+  res.json(
+    GetCurrentAuthUserResponse.parse({
+      user: req.isAuthenticated() ? req.user : null,
+    }),
+  );
+});
+
 router.get("/register", async (req: Request, res: Response) => {
   const returnTo = req.query.returnTo;
   const params = returnTo ? `?returnTo=${encodeURIComponent(String(returnTo))}` : "";
