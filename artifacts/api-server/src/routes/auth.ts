@@ -96,6 +96,12 @@ router.get("/auth/user", (req: Request, res: Response) => {
   );
 });
 
+router.get("/register", async (req: Request, res: Response) => {
+  const returnTo = req.query.returnTo;
+  const params = returnTo ? `?returnTo=${encodeURIComponent(String(returnTo))}` : "";
+  res.redirect(`/api/login${params}`);
+});
+
 router.get("/login", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;

@@ -133,6 +133,42 @@ router.post("/appointments", async (req: Request, res: Response) => {
 
   const { doctorId, hospitalId, date, timeSlot, notes } = parsed.data;
 
+  const [doctor] = await db
+    .select()
+    .from(doctorsTable)
+    .leftJoin(hospitalsTable, eq(doctorsTable.hospitalId, hospitalsTable.id))
+    .where(eq(doctorsTable.id, doctorId))
+    .limit(1);
+
+  if (!doctor) {
+    res.status(404).json({ error: "Doctor not found" });
+    return;
+  }
+  if (doctor.doctors.hospitalId !== hospitalId) {
+    res.status(400).json({ error: "Doctor does not belong to the specified hospital" });
+    return;
+  }
+  if (!doctor.hospitals?.approved) {
+    res.status(400).json({ error: "Hospital is not yet approved" });
+    return;
+  }
+
+  const [avail] = await db
+    .select()
+    .from(availabilityTable)
+    .where(
+      and(
+        eq(availabilityTable.doctorId, doctorId),
+        eq(availabilityTable.date, date),
+      )
+    )
+    .limit(1);
+
+  if (!avail || !avail.timeSlots.includes(timeSlot)) {
+    res.status(400).json({ error: "Requested time slot is not available for this doctor on this date" });
+    return;
+  }
+
   const existing = await db
     .select()
     .from(appointmentsTable)

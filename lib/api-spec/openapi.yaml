@@ -54,6 +54,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUserEnvelope'
+  /register:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserRegister
+      summary: Register a new account (redirects to OIDC login/signup flow)
+      description: >
+        New user registration is handled via the OIDC provider (Replit).
+        This endpoint redirects to the same OIDC authorization endpoint as `/login`.
+        If the user does not have an account, the provider will prompt them to create one.
+        On first login, a new user record is automatically created in the local database with role `patient`.
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          description: Relative path to redirect to after registration (must start with `/`). Defaults to `/`.
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint (same as /login).
   /login:
     get:
       tags: [Auth]

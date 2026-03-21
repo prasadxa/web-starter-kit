@@ -18,9 +18,18 @@ function serializeHospital(h: typeof hospitalsTable.$inferSelect) {
 }
 
 router.get("/hospitals", async (req: Request, res: Response) => {
-  const approved = req.query.approved;
-  const rows = approved !== undefined
-    ? await db.select().from(hospitalsTable).where(eq(hospitalsTable.approved, approved === "true"))
+  const approvedParam = req.query.approved;
+
+  let approvedFilter: boolean | undefined;
+  if (approvedParam !== undefined) {
+    approvedFilter = approvedParam === "true" || approvedParam === "1";
+  } else {
+    const isAdmin = req.isAuthenticated() && (req.user.role === "super_admin" || req.user.role === "hospital_admin");
+    approvedFilter = isAdmin ? undefined : true;
+  }
+
+  const rows = approvedFilter !== undefined
+    ? await db.select().from(hospitalsTable).where(eq(hospitalsTable.approved, approvedFilter))
     : await db.select().from(hospitalsTable);
   res.json(GetHospitalsResponse.parse(rows.map(serializeHospital)));
 });

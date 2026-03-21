@@ -36,11 +36,14 @@ router.get("/doctors", async (req: Request, res: Response) => {
   const limitNum = parseInt(limit) || 12;
   const offset = (pageNum - 1) * limitNum;
 
+  const isAdmin = req.isAuthenticated() && (req.user.role === "super_admin" || req.user.role === "hospital_admin");
+
   const conditions: ReturnType<typeof eq>[] = [];
   if (departmentId) conditions.push(eq(doctorsTable.departmentId, parseInt(departmentId)));
   if (hospitalId) conditions.push(eq(doctorsTable.hospitalId, parseInt(hospitalId)));
   if (minRating) conditions.push(sql`${doctorsTable.averageRating} >= ${parseFloat(minRating)}` as ReturnType<typeof eq>);
   if (maxFee) conditions.push(sql`${doctorsTable.consultationFee} <= ${parseFloat(maxFee)}` as ReturnType<typeof eq>);
+  if (!isAdmin) conditions.push(eq(hospitalsTable.approved, true));
 
   const doctorRows = await db
     .select({
