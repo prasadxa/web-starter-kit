@@ -70,62 +70,145 @@ export default function Dashboard() {
 // ----------------------------------------------------------------------
 // PATIENT DASHBOARD
 // ----------------------------------------------------------------------
+function RescheduleDialog({ appointmentId, doctorId, currentDate, currentSlot, onSuccess }: {
+  appointmentId: number;
+  doctorId: number;
+  currentDate: string;
+  currentSlot: string;
+  onSuccess: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(currentDate);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const updateAppointment = useUpdateAppointment();
+  const availabilityQuery = useGetDoctorAvailability(doctorId);
+  const availability = open ? availabilityQuery.data : undefined;
+  const { toast } = useToast();
+
+  const availableSlots = availability?.find(a => a.date === selectedDate)?.timeSlots ?? [];
+
+  const handleReschedule = () => {
+    if (!selectedSlot) {
+      toast({ title: "Please select a time slot", variant: "destructive" });
+      return;
+    }
+    updateAppointment.mutate({ id: appointmentId, data: { date: selectedDate, timeSlot: selectedSlot } }, {
+      onSuccess: () => {
+        toast({ title: "Appointment rescheduled!" });
+        setOpen(false);
+        onSuccess();
+      },
+      onError: (e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Could not reschedule — slot may already be taken.";
+        toast({ title: "Reschedule failed", description: msg, variant: "destructive" });
+      }
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="rounded-xl">Reschedule</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Reschedule Appointment</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="block text-sm font-semibold mb-1">New Date</label>
+            <Input type="date" value={selectedDate} min={format(new Date(), 'yyyy-MM-dd')} onChange={e => { setSelectedDate(e.target.value); setSelectedSlot(""); }} className="rounded-xl h-11" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold mb-2">Available Time Slots</label>
+            {availableSlots.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 text-center bg-muted/30 rounded-xl">No available slots for selected date.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {availableSlots.map(slot => (
+                  <button
+                    key={slot}
+                    onClick={() => setSelectedSlot(slot)}
+                    className={`py-2 px-3 rounded-xl text-sm font-medium border transition-colors ${selectedSlot === slot ? 'bg-primary text-white border-primary' : 'bg-card border-border hover:border-primary/50 text-foreground'}`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {currentDate === selectedDate && currentSlot === selectedSlot && (
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2">Please select a different date or time slot.</p>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
+          <Button onClick={handleReschedule} disabled={updateAppointment.isPending || !selectedSlot} className="rounded-xl">
+            {updateAppointment.isPending ? "Rescheduling..." : "Confirm"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReviewDialog({ appointmentId, doctorId, doctorName, onSuccess }: { appointmentId: number; doctorId: number; doctorName: string | null; onSuccess: () => void }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [open, setOpen] = useState(false);
+  const createReview = useCreateReview();
+  const { toast } = useToast();
+
+  const submitReview = () => {
+    createReview.mutate({ data: { appointmentId, doctorId, rating, comment } }, {
+      onSuccess: () => {
+        toast({ title: "Review submitted successfully!" });
+        setOpen(false);
+        onSuccess();
+      }
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" variant="outline" className="border-primary text-primary">Leave a Review</Button></DialogTrigger>
+      <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Review Dr. {doctorName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="flex justify-center gap-2">
+            {[1, 2, 3, 4, 5].map(r => (
+              <Star key={r} onClick={() => setRating(r)} className={`w-8 h-8 cursor-pointer ${r <= rating ? 'text-amber-500 fill-amber-500' : 'text-muted'}`} />
+            ))}
+          </div>
+          <Textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Share your experience..." className="rounded-xl" />
+        </div>
+        <DialogFooter>
+          <Button onClick={submitReview} disabled={createReview.isPending} className="rounded-xl">Submit Review</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PatientDashboard() {
   const { data: apptsData } = useGetAppointments({ limit: 50 });
   const updateAppointment = useUpdateAppointment();
-  const createReview = useCreateReview();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
 
   const handleCancel = (id: number) => {
     if(!confirm("Are you sure you want to cancel this appointment?")) return;
     updateAppointment.mutate({ id, data: { status: 'cancelled' } }, {
       onSuccess: () => {
         toast({ title: "Appointment Cancelled" });
-        queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+        invalidate();
       }
     });
   };
-
-  const ReviewDialog = ({ appointmentId, doctorId, doctorName }: { appointmentId: number; doctorId: number; doctorName: string | null }) => {
-    const [rating, setRating] = useState(5);
-    const [comment, setComment] = useState("");
-    const [open, setOpen] = useState(false);
-
-    const submitReview = () => {
-      createReview.mutate({ data: { appointmentId, doctorId, rating, comment } }, {
-        onSuccess: () => {
-          toast({ title: "Review submitted successfully!" });
-          setOpen(false);
-          queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
-        }
-      });
-    };
-
-    return (
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild><Button size="sm" variant="outline" className="border-primary text-primary">Leave a Review</Button></DialogTrigger>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Review Dr. {doctorName}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map(r => (
-                <Star key={r} onClick={() => setRating(r)} className={`w-8 h-8 cursor-pointer ${r <= rating ? 'text-amber-500 fill-amber-500' : 'text-muted'}`} />
-              ))}
-            </div>
-            <Textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Share your experience..." className="rounded-xl" />
-          </div>
-          <DialogFooter>
-            <Button onClick={submitReview} disabled={createBookingLoading} className="rounded-xl">Submit Review</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
-  const createBookingLoading = createReview.isPending;
 
   return (
     <Tabs defaultValue="upcoming" className="w-full">
@@ -149,9 +232,17 @@ function PatientDashboard() {
                 <h3 className="font-bold text-lg">Dr. {appt.doctorFirstName} {appt.doctorLastName}</h3>
                 <p className="text-muted-foreground text-sm flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {appt.timeSlot}</p>
                 <p className="text-muted-foreground text-sm flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {appt.hospitalName}</p>
+                {appt.status === 'pending' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-medium">Awaiting Confirmation</span>}
               </div>
             </div>
             <div className="flex gap-3">
+              <RescheduleDialog
+                appointmentId={appt.id}
+                doctorId={appt.doctorId}
+                currentDate={appt.date}
+                currentSlot={appt.timeSlot}
+                onSuccess={invalidate}
+              />
               <Button variant="destructive" size="sm" className="rounded-xl" onClick={() => handleCancel(appt.id)}>Cancel</Button>
             </div>
           </div>
@@ -175,7 +266,7 @@ function PatientDashboard() {
             </div>
             <div>
               {appt.status === 'completed' && !appt.hasReview && (
-                <ReviewDialog appointmentId={appt.id} doctorId={appt.doctorId} doctorName={appt.doctorLastName ?? null} />
+                <ReviewDialog appointmentId={appt.id} doctorId={appt.doctorId} doctorName={appt.doctorLastName ?? null} onSuccess={invalidate} />
               )}
             </div>
           </div>

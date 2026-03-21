@@ -35,6 +35,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
               Home
             </Link>
             <Link 
+              href="/departments" 
+              className={`text-sm font-semibold transition-colors hover:text-primary ${location === '/departments' ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              Departments
+            </Link>
+            <Link 
               href="/doctors" 
               className={`text-sm font-semibold transition-colors hover:text-primary ${location === '/doctors' ? 'text-primary' : 'text-muted-foreground'}`}
             >

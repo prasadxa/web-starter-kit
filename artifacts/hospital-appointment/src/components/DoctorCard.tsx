@@ -1,7 +1,6 @@
-import { Star, MapPin, Award, IndianRupee, Clock, ChevronRight } from "lucide-react";
+import { Star, MapPin, Award, Clock, ChevronRight, MessageSquare, IndianRupee } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import type { Doctor } from "@workspace/api-client-react";
 import { format } from "date-fns";
 
@@ -47,6 +46,16 @@ export function DoctorCard({ doctor }: { doctor: Doctor }) {
             <div className="flex items-center text-sm text-muted-foreground">
               <MapPin className="w-4 h-4 mr-2 text-muted-foreground/70 shrink-0" />
               <span className="truncate">{doctor.hospitalName}</span>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center text-muted-foreground gap-1">
+                <MessageSquare className="w-4 h-4 text-muted-foreground/70 shrink-0" />
+                <span>{doctor.totalReviews} review{doctor.totalReviews !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center font-semibold text-emerald-700 dark:text-emerald-400 gap-0.5">
+                <IndianRupee className="w-3.5 h-3.5" />
+                <span>{doctor.consultationFee}</span>
+              </div>
             </div>
           </div>
         </div>
