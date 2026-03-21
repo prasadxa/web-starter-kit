@@ -60,8 +60,8 @@ router.patch("/users/profile", async (req: Request, res: Response) => {
   }
 
   if (parsed.data.hospitalId !== undefined) {
-    if (currentRole !== "super_admin" && currentRole !== "hospital_admin") {
-      res.status(403).json({ error: "Only admin users can change hospitalId" });
+    if (currentRole !== "super_admin") {
+      res.status(403).json({ error: "Only super_admin can change hospitalId assignments" });
       return;
     }
     updateData.hospitalId = parsed.data.hospitalId;

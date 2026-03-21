@@ -251,7 +251,11 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
   const userId = req.user.id;
   const role = req.user.role;
   const isPatientOwner = role === "patient" && existing.patientId === userId;
-  const isDoctorOwner = role === "doctor" && req.user.doctorId === existing.doctorId;
+  let isDoctorOwner = false;
+  if (role === "doctor") {
+    const [docRow] = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, userId)).limit(1);
+    isDoctorOwner = !!docRow && docRow.id === existing.doctorId;
+  }
   const isHospitalAdmin = role === "hospital_admin" && req.user.hospitalId === existing.hospitalId;
   const isSuperAdmin = role === "super_admin";
   const canEdit = isSuperAdmin || isPatientOwner || isDoctorOwner || isHospitalAdmin;

@@ -248,15 +248,25 @@ router.patch("/doctors/:id", async (req: Request, res: Response) => {
   }
   const id = parseInt(String(req.params.id));
   const role = req.user.role;
-  const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
+
+  const [targetDoctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
+  if (!targetDoctor) {
+    res.status(404).json({ error: "Doctor not found" });
+    return;
+  }
 
   if (role === "hospital_admin") {
-    const [doctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
-    if (!doctor || doctor.hospitalId !== req.user.hospitalId) {
+    if (targetDoctor.hospitalId !== req.user.hospitalId) {
       res.status(403).json({ error: "Forbidden: doctor does not belong to your hospital" });
       return;
     }
-  } else if (!isOwnDoctor && role !== "super_admin") {
+  } else if (role === "doctor") {
+    const [ownDoc] = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, req.user.id)).limit(1);
+    if (!ownDoc || ownDoc.id !== id) {
+      res.status(403).json({ error: "Forbidden: insufficient permissions" });
+      return;
+    }
+  } else if (role !== "super_admin") {
     res.status(403).json({ error: "Forbidden: insufficient permissions" });
     return;
   }
@@ -334,15 +344,25 @@ router.post("/doctors/:id/availability", async (req: Request, res: Response) => 
   }
   const id = parseInt(String(req.params.id));
   const role = req.user.role;
-  const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
+
+  const [targetDoctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
+  if (!targetDoctor) {
+    res.status(404).json({ error: "Doctor not found" });
+    return;
+  }
 
   if (role === "hospital_admin") {
-    const [doctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
-    if (!doctor || doctor.hospitalId !== req.user.hospitalId) {
+    if (targetDoctor.hospitalId !== req.user.hospitalId) {
       res.status(403).json({ error: "Forbidden: doctor does not belong to your hospital" });
       return;
     }
-  } else if (!isOwnDoctor && role !== "super_admin") {
+  } else if (role === "doctor") {
+    const [ownDoc] = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, req.user.id)).limit(1);
+    if (!ownDoc || ownDoc.id !== id) {
+      res.status(403).json({ error: "Forbidden: cannot manage this doctor's availability" });
+      return;
+    }
+  } else if (role !== "super_admin") {
     res.status(403).json({ error: "Forbidden: cannot manage this doctor's availability" });
     return;
   }

@@ -19,9 +19,14 @@ import {
   useGetHospitals,
   useUpdateHospital,
   useGetDoctors,
+  useCreateDoctor,
+  useGetDepartments,
+  useCreateDepartment,
   getGetAppointmentsQueryKey,
   getGetAdminAnalyticsQueryKey,
   getGetHospitalsQueryKey,
+  getGetDoctorsQueryKey,
+  getGetDepartmentsQueryKey,
   type Doctor,
   type AppointmentDetail,
 } from "@workspace/api-client-react";
@@ -351,11 +356,19 @@ function SuperAdminDashboard() {
 function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
   const { data: apptsData, isLoading: apptsLoading } = useGetAppointments({ hospitalId, limit: 100 });
   const { data: hospitalsData } = useGetHospitals();
-  const { data: doctorsData } = useGetDoctors({ hospitalId });
+  const { data: doctorsData, refetch: refetchDoctors } = useGetDoctors({ hospitalId });
+  const { data: departments, refetch: refetchDepts } = useGetDepartments();
   const updateAppointment = useUpdateAppointment();
-  const updateHospital = useUpdateHospital();
+  const createDoctor = useCreateDoctor();
+  const createDepartment = useCreateDepartment();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [addDoctorOpen, setAddDoctorOpen] = useState(false);
+  const [addDeptOpen, setAddDeptOpen] = useState(false);
+
+  const [newDoctor, setNewDoctor] = useState({ userId: '', departmentId: '', experience: '', consultationFee: '', specialization: '', qualification: '', bio: '' });
+  const [newDept, setNewDept] = useState({ name: '', description: '' });
 
   const hospital = hospitalsData?.find((h: { id: number }) => h.id === hospitalId);
 
@@ -365,6 +378,53 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
         toast({ title: `Appointment marked as ${status}` });
         queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
       }
+    });
+  };
+
+  const handleAddDoctor = () => {
+    if (!newDoctor.userId || !newDoctor.departmentId || !newDoctor.experience || !newDoctor.consultationFee) {
+      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+    createDoctor.mutate({
+      data: {
+        userId: newDoctor.userId.trim(),
+        hospitalId,
+        departmentId: parseInt(newDoctor.departmentId),
+        experience: parseInt(newDoctor.experience),
+        consultationFee: parseFloat(newDoctor.consultationFee),
+        specialization: newDoctor.specialization || undefined,
+        qualification: newDoctor.qualification || undefined,
+        bio: newDoctor.bio || undefined,
+      }
+    }, {
+      onSuccess: () => {
+        toast({ title: "Doctor added successfully!" });
+        setAddDoctorOpen(false);
+        setNewDoctor({ userId: '', departmentId: '', experience: '', consultationFee: '', specialization: '', qualification: '', bio: '' });
+        queryClient.invalidateQueries({ queryKey: getGetDoctorsQueryKey({ hospitalId }) });
+        refetchDoctors();
+      },
+      onError: () => toast({ title: "Failed to add doctor. Check that the user ID is valid and the user exists.", variant: "destructive" })
+    });
+  };
+
+  const handleAddDepartment = () => {
+    if (!newDept.name) {
+      toast({ title: "Department name is required", variant: "destructive" });
+      return;
+    }
+    createDepartment.mutate({
+      data: { name: newDept.name, description: newDept.description || undefined }
+    }, {
+      onSuccess: () => {
+        toast({ title: "Department created successfully!" });
+        setAddDeptOpen(false);
+        setNewDept({ name: '', description: '' });
+        queryClient.invalidateQueries({ queryKey: getGetDepartmentsQueryKey() });
+        refetchDepts();
+      },
+      onError: () => toast({ title: "Failed to create department.", variant: "destructive" })
     });
   };
 
@@ -409,7 +469,8 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
       <Tabs defaultValue="appointments" className="w-full">
         <TabsList className="mb-6 bg-muted/50 p-1 border border-border/50 rounded-xl">
           <TabsTrigger value="appointments" className="rounded-lg">All Appointments</TabsTrigger>
-          <TabsTrigger value="doctors" className="rounded-lg">Doctors</TabsTrigger>
+          <TabsTrigger value="doctors" className="rounded-lg">Doctors ({doctors.length})</TabsTrigger>
+          <TabsTrigger value="departments" className="rounded-lg">Departments</TabsTrigger>
         </TabsList>
 
         <TabsContent value="appointments" className="space-y-4">
@@ -428,6 +489,7 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
                 </div>
                 <div>
                   <h3 className="font-semibold">Dr. {appt.doctorFirstName} {appt.doctorLastName}</h3>
+                  <p className="text-sm text-muted-foreground">Patient: {appt.patientFirstName} {appt.patientLastName}</p>
                   <p className="text-muted-foreground text-sm flex items-center gap-1"><Clock className="w-3 h-3" /> {appt.timeSlot}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     appt.status === 'booked' ? 'bg-blue-100 text-blue-700' :
@@ -450,34 +512,146 @@ function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
           ))}
         </TabsContent>
 
-        <TabsContent value="doctors" className="space-y-4">
-          {doctors.length === 0 && (
-            <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed">
-              <p className="text-muted-foreground">No doctors assigned to your hospital yet.</p>
-            </div>
-          )}
-          {doctors.map((doc: Doctor) => (
-            <div key={doc.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm flex justify-between items-center gap-4">
-              <div className="flex gap-4 items-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-lg shrink-0">
-                  {doc.firstName?.[0] ?? 'D'}
-                </div>
-                <div>
-                  <h3 className="font-semibold">Dr. {doc.firstName} {doc.lastName}</h3>
-                  <p className="text-sm text-muted-foreground">{doc.specialization}</p>
-                  <div className="flex items-center gap-1 text-amber-500 text-sm">
-                    <Star className="w-3.5 h-3.5 fill-amber-500" />
-                    <span>{(doc.averageRating ?? 0).toFixed(1)}</span>
-                    <span className="text-muted-foreground">({doc.totalReviews ?? 0} reviews)</span>
+        <TabsContent value="doctors">
+          <div className="flex justify-end mb-4">
+            <Dialog open={addDoctorOpen} onOpenChange={setAddDoctorOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl gap-2"><UserPlus className="w-4 h-4" /> Add Doctor</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Doctor</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">User ID <span className="text-destructive">*</span></label>
+                    <Input value={newDoctor.userId} onChange={e => setNewDoctor(d => ({ ...d, userId: e.target.value }))} placeholder="e.g. seed-doctor-1 or UUID" className="rounded-xl" />
+                    <p className="text-xs text-muted-foreground mt-1">The user account ID that will become a doctor profile</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Department <span className="text-destructive">*</span></label>
+                    <select
+                      value={newDoctor.departmentId}
+                      onChange={e => setNewDoctor(d => ({ ...d, departmentId: e.target.value }))}
+                      className="w-full border border-input bg-background rounded-xl px-3 h-10 text-sm"
+                    >
+                      <option value="">-- Select department --</option>
+                      {departments?.map((dept: { id: number; name: string }) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Experience (years) <span className="text-destructive">*</span></label>
+                      <Input type="number" min="0" value={newDoctor.experience} onChange={e => setNewDoctor(d => ({ ...d, experience: e.target.value }))} placeholder="e.g. 5" className="rounded-xl" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Consultation Fee <span className="text-destructive">*</span></label>
+                      <Input type="number" min="0" value={newDoctor.consultationFee} onChange={e => setNewDoctor(d => ({ ...d, consultationFee: e.target.value }))} placeholder="e.g. 500" className="rounded-xl" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Specialization</label>
+                    <Input value={newDoctor.specialization} onChange={e => setNewDoctor(d => ({ ...d, specialization: e.target.value }))} placeholder="e.g. Cardiology" className="rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Qualification</label>
+                    <Input value={newDoctor.qualification} onChange={e => setNewDoctor(d => ({ ...d, qualification: e.target.value }))} placeholder="e.g. MBBS, MD" className="rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Bio</label>
+                    <Textarea value={newDoctor.bio} onChange={e => setNewDoctor(d => ({ ...d, bio: e.target.value }))} placeholder="Brief professional bio..." className="rounded-xl resize-none" rows={3} />
                   </div>
                 </div>
+                <DialogFooter>
+                  <DialogClose asChild><Button variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
+                  <Button onClick={handleAddDoctor} disabled={createDoctor.isPending} className="rounded-xl">
+                    {createDoctor.isPending ? "Adding..." : "Add Doctor"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="space-y-4">
+            {doctors.length === 0 && (
+              <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed">
+                <p className="text-muted-foreground mb-4">No doctors assigned to your hospital yet.</p>
+                <Button onClick={() => setAddDoctorOpen(true)} className="rounded-xl gap-2"><UserPlus className="w-4 h-4" /> Add First Doctor</Button>
               </div>
-              <div className="text-right shrink-0">
-                <p className="font-semibold text-primary">₹{doc.consultationFee}</p>
-                <p className="text-xs text-muted-foreground">{doc.experience} yr exp.</p>
+            )}
+            {doctors.map((doc: Doctor) => (
+              <div key={doc.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm flex justify-between items-center gap-4">
+                <div className="flex gap-4 items-center">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                    {doc.firstName?.[0] ?? 'D'}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Dr. {doc.firstName} {doc.lastName}</h3>
+                    <p className="text-sm text-muted-foreground">{doc.specialization} {doc.qualification ? `• ${doc.qualification}` : ''}</p>
+                    <div className="flex items-center gap-1 text-amber-500 text-sm">
+                      <Star className="w-3.5 h-3.5 fill-amber-500" />
+                      <span>{(doc.averageRating ?? 0).toFixed(1)}</span>
+                      <span className="text-muted-foreground">({doc.totalReviews ?? 0} reviews)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-primary">₹{doc.consultationFee}</p>
+                  <p className="text-xs text-muted-foreground">{doc.experience} yr exp.</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="departments">
+          <div className="flex justify-end mb-4">
+            <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl gap-2"><PieChartIcon className="w-4 h-4" /> Add Department</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Department</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Department Name <span className="text-destructive">*</span></label>
+                    <Input value={newDept.name} onChange={e => setNewDept(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Neurology" className="rounded-xl" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Description</label>
+                    <Textarea value={newDept.description} onChange={e => setNewDept(d => ({ ...d, description: e.target.value }))} placeholder="Brief description of the department..." className="rounded-xl resize-none" rows={3} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild><Button variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
+                  <Button onClick={handleAddDepartment} disabled={createDepartment.isPending} className="rounded-xl">
+                    {createDepartment.isPending ? "Creating..." : "Create Department"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="space-y-3">
+            {(!departments || departments.length === 0) && (
+              <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed">
+                <p className="text-muted-foreground mb-4">No departments created yet.</p>
+              </div>
+            )}
+            {departments?.map((dept: { id: number; name: string; description?: string | null }) => (
+              <div key={dept.id} className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
+                  <PieChartIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{dept.name}</h3>
+                  {dept.description && <p className="text-sm text-muted-foreground">{dept.description}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
