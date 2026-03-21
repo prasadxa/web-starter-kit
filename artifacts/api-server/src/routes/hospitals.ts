@@ -18,14 +18,13 @@ function serializeHospital(h: typeof hospitalsTable.$inferSelect) {
 }
 
 router.get("/hospitals", async (req: Request, res: Response) => {
-  const approvedParam = req.query.approved;
+  const isAdmin = req.isAuthenticated() && (req.user.role === "super_admin" || req.user.role === "hospital_admin");
 
   let approvedFilter: boolean | undefined;
-  if (approvedParam !== undefined) {
-    approvedFilter = approvedParam === "true" || approvedParam === "1";
-  } else {
-    const isAdmin = req.isAuthenticated() && (req.user.role === "super_admin" || req.user.role === "hospital_admin");
-    approvedFilter = isAdmin ? undefined : true;
+  if (isAdmin && req.query.approved !== undefined) {
+    approvedFilter = req.query.approved === "true" || req.query.approved === "1";
+  } else if (!isAdmin) {
+    approvedFilter = true;
   }
 
   const rows = approvedFilter !== undefined

@@ -125,6 +125,10 @@ router.post("/appointments", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+  if (req.user.role !== "patient") {
+    res.status(403).json({ error: "Only patients can book appointments" });
+    return;
+  }
   const parsed = CreateAppointmentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });
@@ -318,16 +322,34 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
     }
   }
 
-  const changingSlot = (parsed.data.date && parsed.data.date !== existing.date) || (parsed.data.timeSlot && parsed.data.timeSlot !== existing.timeSlot);
+  const newDate = parsed.data.date ?? existing.date;
+  const newTimeSlot = parsed.data.timeSlot ?? existing.timeSlot;
+  const changingSlot = parsed.data.date !== undefined || parsed.data.timeSlot !== undefined;
+
   if (changingSlot) {
+    const [avail] = await db
+      .select()
+      .from(availabilityTable)
+      .where(
+        and(
+          eq(availabilityTable.doctorId, existing.doctorId),
+          eq(availabilityTable.date, newDate),
+        )
+      )
+      .limit(1);
+    if (!avail || !avail.timeSlots.includes(newTimeSlot)) {
+      res.status(400).json({ error: "Requested time slot is not in doctor's availability for this date" });
+      return;
+    }
+
     const conflict = await db
       .select()
       .from(appointmentsTable)
       .where(
         and(
           eq(appointmentsTable.doctorId, existing.doctorId),
-          eq(appointmentsTable.date, parsed.data.date ?? existing.date),
-          eq(appointmentsTable.timeSlot, parsed.data.timeSlot ?? existing.timeSlot),
+          eq(appointmentsTable.date, newDate),
+          eq(appointmentsTable.timeSlot, newTimeSlot),
           sql`${appointmentsTable.status} IN ('booked', 'pending')`,
         )
       )
