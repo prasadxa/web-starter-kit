@@ -8,7 +8,7 @@
 import type { UserProfileRole } from "./userProfileRole";
 
 export interface UserProfile {
-  id: number;
+  id: string;
   replitUserId: string;
   /** @nullable */
   email?: string | null;

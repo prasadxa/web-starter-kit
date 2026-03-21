@@ -9,6 +9,9 @@ import Departments from "./pages/Departments";
 import DoctorProfile from "./pages/DoctorProfile";
 import Booking from "./pages/Booking";
 import Dashboard from "./pages/Dashboard";
+import MedicalRecords from "./pages/MedicalRecords";
+import Analytics from "./pages/Analytics";
+import SymptomCheckerPage from "./pages/SymptomCheckerPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -22,6 +25,9 @@ function Router() {
       <Route path="/doctors/:id" component={DoctorProfile} />
       <Route path="/doctors/:id/book" component={Booking} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/medical-records" component={MedicalRecords} />
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/symptom-checker" component={SymptomCheckerPage} />
       <Route component={NotFound} />
     </Switch>
   );

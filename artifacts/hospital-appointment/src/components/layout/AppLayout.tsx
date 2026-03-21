@@ -2,13 +2,14 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
-import { HeartPulse, LayoutDashboard, LogOut } from "lucide-react";
+import { HeartPulse, LayoutDashboard, LogOut, FileText, Brain, BarChart3 } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import NotificationBell from "@/components/NotificationBell";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, login, logout } = useAuth();
@@ -48,37 +49,58 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </Link>
           </nav>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2 pl-2 pr-4 rounded-full border-border hover:border-primary/50 transition-colors bg-card hover:bg-card">
-                    <img 
-                      src={user?.profileImageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.firstName}`} 
-                      alt="Avatar" 
-                      className="w-7 h-7 rounded-full bg-muted object-cover" 
-                    />
-                    <span className="hidden sm:inline font-semibold text-sm">
-                      {user?.firstName || "User"}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-xl p-2">
-                  <DropdownMenuItem asChild className="p-3 cursor-pointer rounded-lg font-medium">
-                    <Link href="/dashboard" className="flex items-center w-full">
-                      <LayoutDashboard className="w-4 h-4 mr-3 text-primary" />
-                      My Dashboard
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={logout} 
-                    className="p-3 cursor-pointer rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
-                  >
-                    <LogOut className="w-4 h-4 mr-3" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <NotificationBell />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2 pl-2 pr-4 rounded-full border-border hover:border-primary/50 transition-colors bg-card hover:bg-card">
+                      <img 
+                        src={user?.profileImageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.firstName}`} 
+                        alt="Avatar" 
+                        className="w-7 h-7 rounded-full bg-muted object-cover" 
+                      />
+                      <span className="hidden sm:inline font-semibold text-sm">
+                        {user?.firstName || "User"}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 rounded-xl p-2">
+                    <DropdownMenuItem asChild className="p-3 cursor-pointer rounded-lg font-medium">
+                      <Link href="/dashboard" className="flex items-center w-full">
+                        <LayoutDashboard className="w-4 h-4 mr-3 text-primary" />
+                        My Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="p-3 cursor-pointer rounded-lg font-medium">
+                      <Link href="/medical-records" className="flex items-center w-full">
+                        <FileText className="w-4 h-4 mr-3 text-emerald-500" />
+                        Medical Records
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="p-3 cursor-pointer rounded-lg font-medium">
+                      <Link href="/symptom-checker" className="flex items-center w-full">
+                        <Brain className="w-4 h-4 mr-3 text-purple-500" />
+                        AI Symptom Checker
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="p-3 cursor-pointer rounded-lg font-medium">
+                      <Link href="/analytics" className="flex items-center w-full">
+                        <BarChart3 className="w-4 h-4 mr-3 text-blue-500" />
+                        Analytics
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={logout} 
+                      className="p-3 cursor-pointer rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10 font-medium"
+                    >
+                      <LogOut className="w-4 h-4 mr-3" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             ) : (
               <Button 
                 onClick={login} 

@@ -24,9 +24,9 @@ async function seed() {
   const hospitals = await db
     .insert(hospitalsTable)
     .values([
-      { name: "City Medical Center", location: "123 Main St, Downtown, NY 10001", approved: true, phone: "+1-555-0101", email: "info@citymedical.com", description: "A leading multi-specialty hospital serving the city for over 50 years." },
-      { name: "Green Valley Hospital", location: "456 Oak Avenue, Green Valley, CA 90210", approved: true, phone: "+1-555-0202", email: "contact@greenvalley.com", description: "State-of-the-art facility with world-class specialists." },
-      { name: "Sunrise Health Clinic", location: "789 Sunrise Blvd, Miami, FL 33101", approved: true, phone: "+1-555-0303", email: "hello@sunrisehealth.com", description: "Comprehensive outpatient care with compassionate service." },
+      { name: "City Medical Center", location: "123 Main St, Downtown, NY 10001", approved: true, phone: "+1-555-0101", email: "info@citymedical.com", description: "A leading multi-specialty hospital serving the city for over 50 years.", latitude: 40.7128, longitude: -74.006 },
+      { name: "Green Valley Hospital", location: "456 Oak Avenue, Green Valley, CA 90210", approved: true, phone: "+1-555-0202", email: "contact@greenvalley.com", description: "State-of-the-art facility with world-class specialists.", latitude: 34.0522, longitude: -118.2437 },
+      { name: "Sunrise Health Clinic", location: "789 Sunrise Blvd, Miami, FL 33101", approved: true, phone: "+1-555-0303", email: "hello@sunrisehealth.com", description: "Comprehensive outpatient care with compassionate service.", latitude: 25.7617, longitude: -80.1918 },
     ])
     .onConflictDoNothing()
     .returning();

@@ -79,6 +79,10 @@ export interface Hospital {
   description?: string | null;
   /** @nullable */
   imageUrl?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
   createdAt?: string;
 }
 
@@ -88,6 +92,8 @@ export interface CreateHospitalBody {
   phone?: string;
   email?: string;
   description?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UpdateHospitalBody {
@@ -97,6 +103,8 @@ export interface UpdateHospitalBody {
   phone?: string;
   email?: string;
   description?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Doctor {
@@ -144,6 +152,11 @@ export interface Review {
   rating: number;
   /** @nullable */
   comment?: string | null;
+  verifiedPatient?: boolean;
+  /** @nullable */
+  doctorReply?: string | null;
+  /** @nullable */
+  doctorReplyAt?: string | null;
   createdAt: string;
   /** @nullable */
   patientFirstName?: string | null;
@@ -234,6 +247,24 @@ export const AppointmentStatus = {
   pending: "pending",
 } as const;
 
+export type AppointmentPaymentStatus =
+  (typeof AppointmentPaymentStatus)[keyof typeof AppointmentPaymentStatus];
+
+export const AppointmentPaymentStatus = {
+  pending: "pending",
+  paid: "paid",
+  failed: "failed",
+  refunded: "refunded",
+} as const;
+
+export type AppointmentConsultationType =
+  (typeof AppointmentConsultationType)[keyof typeof AppointmentConsultationType];
+
+export const AppointmentConsultationType = {
+  offline: "offline",
+  online: "online",
+} as const;
+
 export interface Appointment {
   id: number;
   patientId: string;
@@ -246,6 +277,14 @@ export interface Appointment {
   notes?: string | null;
   createdAt?: string;
   hasReview?: boolean;
+  paymentStatus?: AppointmentPaymentStatus;
+  /** @nullable */
+  paymentId?: string | null;
+  /** @nullable */
+  stripeSessionId?: string | null;
+  consultationType?: AppointmentConsultationType;
+  /** @nullable */
+  meetingLink?: string | null;
 }
 
 export type AppointmentDetailStatus =
@@ -256,6 +295,24 @@ export const AppointmentDetailStatus = {
   cancelled: "cancelled",
   completed: "completed",
   pending: "pending",
+} as const;
+
+export type AppointmentDetailPaymentStatus =
+  (typeof AppointmentDetailPaymentStatus)[keyof typeof AppointmentDetailPaymentStatus];
+
+export const AppointmentDetailPaymentStatus = {
+  pending: "pending",
+  paid: "paid",
+  failed: "failed",
+  refunded: "refunded",
+} as const;
+
+export type AppointmentDetailConsultationType =
+  (typeof AppointmentDetailConsultationType)[keyof typeof AppointmentDetailConsultationType];
+
+export const AppointmentDetailConsultationType = {
+  offline: "offline",
+  online: "online",
 } as const;
 
 export interface AppointmentDetail {
@@ -270,6 +327,14 @@ export interface AppointmentDetail {
   notes?: string | null;
   createdAt?: string;
   hasReview?: boolean;
+  paymentStatus?: AppointmentDetailPaymentStatus;
+  /** @nullable */
+  paymentId?: string | null;
+  /** @nullable */
+  stripeSessionId?: string | null;
+  consultationType?: AppointmentDetailConsultationType;
+  /** @nullable */
+  meetingLink?: string | null;
   /** @nullable */
   doctorFirstName?: string | null;
   /** @nullable */
@@ -295,12 +360,21 @@ export interface AppointmentListResponse {
   limit: number;
 }
 
+export type CreateAppointmentBodyConsultationType =
+  (typeof CreateAppointmentBodyConsultationType)[keyof typeof CreateAppointmentBodyConsultationType];
+
+export const CreateAppointmentBodyConsultationType = {
+  offline: "offline",
+  online: "online",
+} as const;
+
 export interface CreateAppointmentBody {
   doctorId: number;
   hospitalId: number;
   date: string;
   timeSlot: string;
   notes?: string;
+  consultationType?: CreateAppointmentBodyConsultationType;
 }
 
 export type UpdateAppointmentBodyStatus =
@@ -415,10 +489,142 @@ export interface AdminUpdateUserBody {
   hospitalId?: number;
 }
 
+export interface SymptomCheckBody {
+  symptoms: string;
+}
+
+export type SymptomCheckResponseConditionsItem = {
+  name: string;
+  probability: string;
+  description?: string;
+};
+
+export interface SymptomCheckResponse {
+  conditions: SymptomCheckResponseConditionsItem[];
+  recommendedDepartment: string;
+  advice: string;
+}
+
+export type NotificationItemType =
+  (typeof NotificationItemType)[keyof typeof NotificationItemType];
+
+export const NotificationItemType = {
+  appointment_confirmed: "appointment_confirmed",
+  appointment_cancelled: "appointment_cancelled",
+  appointment_reminder: "appointment_reminder",
+  payment_received: "payment_received",
+  review_received: "review_received",
+  doctor_reply: "doctor_reply",
+  general: "general",
+} as const;
+
+export interface NotificationItem {
+  id: number;
+  userId: string;
+  type: NotificationItemType;
+  title: string;
+  message: string;
+  read: boolean;
+  /** @nullable */
+  link?: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  notifications: NotificationItem[];
+  total: number;
+  unreadCount: number;
+}
+
+export interface MedicalRecord {
+  id: number;
+  patientId: string;
+  /** @nullable */
+  doctorId?: number | null;
+  /** @nullable */
+  appointmentId?: number | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  fileUrl?: string | null;
+  /** @nullable */
+  fileType?: string | null;
+  /** @nullable */
+  diagnosis?: string | null;
+  /** @nullable */
+  prescription?: string | null;
+  createdAt: string;
+}
+
+export interface CreateMedicalRecordBody {
+  patientId: string;
+  doctorId?: number;
+  appointmentId?: number;
+  title: string;
+  description?: string;
+  fileUrl?: string;
+  fileType?: string;
+  diagnosis?: string;
+  prescription?: string;
+}
+
+export interface ReviewReplyBody {
+  reply: string;
+}
+
+export type EnhancedAnalyticsAppointmentsByStatus = {
+  booked?: number;
+  cancelled?: number;
+  completed?: number;
+  pending?: number;
+};
+
+export type EnhancedAnalyticsTopDepartmentsItem = {
+  name: string;
+  count: number;
+};
+
+export type EnhancedAnalyticsDailyTrendsItem = {
+  date: string;
+  count: number;
+  revenue: number;
+};
+
+export interface EnhancedAnalytics {
+  totalHospitals: number;
+  totalDoctors: number;
+  totalPatients: number;
+  totalAppointments: number;
+  totalRevenue: number;
+  pendingHospitalApprovals?: number;
+  appointmentsByStatus: EnhancedAnalyticsAppointmentsByStatus;
+  topDoctors: Doctor[];
+  topDepartments: EnhancedAnalyticsTopDepartmentsItem[];
+  dailyTrends: EnhancedAnalyticsDailyTrendsItem[];
+  recentAppointments: AppointmentDetail[];
+}
+
+export interface CreatePaymentSessionBody {
+  appointmentId: number;
+}
+
+export interface PaymentSessionResponse {
+  sessionId: string;
+  url: string;
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */
 export type AuthorizationSessionHeaderParameter = string;
+
+export type BeginBrowserRegisterParams = {
+  /**
+   * Relative path to redirect to after registration (must start with `/`). Defaults to `/`.
+   */
+  returnTo?: string;
+};
 
 export type BeginBrowserLoginParams = {
   /**
@@ -486,3 +692,13 @@ export const GetAppointmentsStatus = {
   completed: "completed",
   pending: "pending",
 } as const;
+
+export type GetNotificationsParams = {
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+};
+
+export type GetMedicalRecordsParams = {
+  patientId?: string;
+};

@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, unique, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +9,9 @@ export const reviewsTable = pgTable("reviews", {
   appointmentId: integer("appointment_id"),
   rating: integer("rating").notNull(),
   comment: text("comment"),
+  verifiedPatient: boolean("verified_patient").notNull().default(false),
+  doctorReply: text("doctor_reply"),
+  doctorReplyAt: timestamp("doctor_reply_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   unique("reviews_one_per_appointment").on(table.appointmentId),

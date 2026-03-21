@@ -30,7 +30,7 @@ router.get("/hospitals", async (req: Request, res: Response) => {
   const rows = approvedFilter !== undefined
     ? await db.select().from(hospitalsTable).where(eq(hospitalsTable.approved, approvedFilter))
     : await db.select().from(hospitalsTable);
-  res.json(GetHospitalsResponse.parse(rows.map(serializeHospital)));
+  res.json(rows.map(serializeHospital));
 });
 
 router.post("/hospitals", async (req: Request, res: Response) => {
@@ -63,7 +63,7 @@ router.get("/hospitals/:id", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Hospital not found" });
     return;
   }
-  res.json(GetHospitalResponse.parse(serializeHospital(hospital)));
+  res.json(serializeHospital(hospital));
 });
 
 router.patch("/hospitals/:id", async (req: Request, res: Response) => {

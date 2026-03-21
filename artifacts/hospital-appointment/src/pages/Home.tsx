@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DoctorCard } from "@/components/DoctorCard";
-import { useGetDoctors, useGetDepartments } from "@workspace/api-client-react";
+import HospitalMap from "@/components/HospitalMap";
+import { useGetDoctors, useGetDepartments, useGetHospitals } from "@workspace/api-client-react";
 
 export default function Home() {
   const [search, setSearch] = useState("");
@@ -14,6 +15,7 @@ export default function Home() {
 
   const { data: doctorsData, isLoading: docsLoading } = useGetDoctors({ sort: 'score', limit: 4 });
   const { data: departments, isLoading: deptsLoading } = useGetDepartments();
+  const { data: hospitals } = useGetHospitals();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +155,14 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {hospitals && hospitals.length > 0 && (
+        <section className="py-20 bg-background border-t border-border/50">
+          <div className="max-w-7xl mx-auto px-4">
+            <HospitalMap hospitals={hospitals} />
+          </div>
+        </section>
+      )}
     </AppLayout>
   );
 }

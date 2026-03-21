@@ -68,6 +68,7 @@ router.post("/reviews", async (req: Request, res: Response) => {
       appointmentId,
       rating,
       comment: comment ?? null,
+      verifiedPatient: true,
     })
     .returning();
 
@@ -96,6 +97,55 @@ router.post("/reviews", async (req: Request, res: Response) => {
 
   res.status(201).json({
     ...review,
+    patientFirstName: patient[0]?.firstName ?? null,
+    patientLastName: patient[0]?.lastName ?? null,
+    patientProfileImageUrl: patient[0]?.profileImageUrl ?? null,
+  });
+});
+
+router.patch("/reviews/:id/reply", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (req.user.role !== "doctor") {
+    res.status(403).json({ error: "Only doctors can reply to reviews" });
+    return;
+  }
+
+  const reviewId = parseInt(String(req.params.id));
+  const { reply } = req.body;
+
+  if (!reply || typeof reply !== "string") {
+    res.status(400).json({ error: "Reply text is required" });
+    return;
+  }
+
+  const [review] = await db.select().from(reviewsTable).where(eq(reviewsTable.id, reviewId)).limit(1);
+  if (!review) {
+    res.status(404).json({ error: "Review not found" });
+    return;
+  }
+
+  const [doc] = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, req.user.id)).limit(1);
+  if (!doc || doc.id !== review.doctorId) {
+    res.status(403).json({ error: "You can only reply to reviews on your own profile" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(reviewsTable)
+    .set({ doctorReply: reply, doctorReplyAt: new Date() })
+    .where(eq(reviewsTable.id, reviewId))
+    .returning();
+
+  const patient = await db.select().from(usersTable).where(eq(usersTable.id, updated.patientId)).limit(1);
+
+  res.json({
+    ...updated,
+    createdAt: updated.createdAt instanceof Date ? updated.createdAt.toISOString() : updated.createdAt,
+    doctorReplyAt: updated.doctorReplyAt instanceof Date ? updated.doctorReplyAt.toISOString() : updated.doctorReplyAt,
     patientFirstName: patient[0]?.firstName ?? null,
     patientLastName: patient[0]?.lastName ?? null,
     patientProfileImageUrl: patient[0]?.profileImageUrl ?? null,

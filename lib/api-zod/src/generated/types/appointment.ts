@@ -5,6 +5,8 @@
  * MediBook Multi-Hospital Doctor Appointment System API
  * OpenAPI spec version: 0.1.0
  */
+import type { AppointmentConsultationType } from "./appointmentConsultationType";
+import type { AppointmentPaymentStatus } from "./appointmentPaymentStatus";
 import type { AppointmentStatus } from "./appointmentStatus";
 
 export interface Appointment {
@@ -19,4 +21,12 @@ export interface Appointment {
   notes?: string | null;
   createdAt?: Date;
   hasReview?: boolean;
+  paymentStatus?: AppointmentPaymentStatus;
+  /** @nullable */
+  paymentId?: string | null;
+  /** @nullable */
+  stripeSessionId?: string | null;
+  consultationType?: AppointmentConsultationType;
+  /** @nullable */
+  meetingLink?: string | null;
 }

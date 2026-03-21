@@ -8,6 +8,10 @@ import appointmentsRouter from "./appointments";
 import reviewsRouter from "./reviews";
 import usersRouter from "./users";
 import adminRouter from "./admin";
+import symptomsRouter from "./symptoms";
+import notificationsRouter from "./notifications";
+import medicalRecordsRouter from "./medical-records";
+import paymentsRouter from "./payments";
 
 const router: IRouter = Router();
 
@@ -20,5 +24,9 @@ router.use(appointmentsRouter);
 router.use(reviewsRouter);
 router.use(usersRouter);
 router.use(adminRouter);
+router.use(symptomsRouter);
+router.use(notificationsRouter);
+router.use(medicalRecordsRouter);
+router.use(paymentsRouter);
 
 export default router;

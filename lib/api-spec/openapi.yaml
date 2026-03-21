@@ -773,6 +773,178 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserProfile"
 
+  /symptoms/check:
+    post:
+      operationId: checkSymptoms
+      tags: [symptoms]
+      summary: AI-powered symptom checker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SymptomCheckBody"
+      responses:
+        "200":
+          description: AI symptom analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymptomCheckResponse"
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get user notifications
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notification marked as read
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All notifications marked as read
+
+  /medical-records:
+    get:
+      operationId: getMedicalRecords
+      tags: [medical-records]
+      summary: Get medical records for a patient
+      parameters:
+        - name: patientId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of medical records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MedicalRecord"
+    post:
+      operationId: createMedicalRecord
+      tags: [medical-records]
+      summary: Create a medical record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicalRecordBody"
+      responses:
+        "201":
+          description: Medical record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalRecord"
+
+  /reviews/{id}/reply:
+    patch:
+      operationId: replyToReview
+      tags: [reviews]
+      summary: Doctor replies to a review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewReplyBody"
+      responses:
+        "200":
+          description: Reply saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /admin/analytics/enhanced:
+    get:
+      operationId: getEnhancedAnalytics
+      tags: [admin]
+      summary: Get enhanced analytics with revenue and trends
+      responses:
+        "200":
+          description: Enhanced analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnhancedAnalytics"
+
+  /payments/create-session:
+    post:
+      operationId: createPaymentSession
+      tags: [payments]
+      summary: Create a Stripe checkout session for an appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentSessionBody"
+      responses:
+        "200":
+          description: Stripe session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSessionResponse"
+
+  /payments/webhook:
+    post:
+      operationId: handlePaymentWebhook
+      tags: [payments]
+      summary: Stripe webhook handler
+      responses:
+        "200":
+          description: Webhook processed
+
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -905,6 +1077,10 @@ components:
           type: [string, 'null']
         imageUrl:
           type: [string, 'null']
+        latitude:
+          type: [number, 'null']
+        longitude:
+          type: [number, 'null']
         createdAt:
           type: string
           format: date-time
@@ -923,6 +1099,10 @@ components:
           type: string
         description:
           type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
 
     UpdateHospitalBody:
       type: object
@@ -939,6 +1119,10 @@ components:
           type: string
         description:
           type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
 
     Doctor:
       type: object
@@ -1135,6 +1319,18 @@ components:
           format: date-time
         hasReview:
           type: boolean
+        paymentStatus:
+          type: string
+          enum: [pending, paid, failed, refunded]
+        paymentId:
+          type: [string, 'null']
+        stripeSessionId:
+          type: [string, 'null']
+        consultationType:
+          type: string
+          enum: [offline, online]
+        meetingLink:
+          type: [string, 'null']
 
     AppointmentDetail:
       type: object
@@ -1163,6 +1359,18 @@ components:
           format: date-time
         hasReview:
           type: boolean
+        paymentStatus:
+          type: string
+          enum: [pending, paid, failed, refunded]
+        paymentId:
+          type: [string, 'null']
+        stripeSessionId:
+          type: [string, 'null']
+        consultationType:
+          type: string
+          enum: [offline, online]
+        meetingLink:
+          type: [string, 'null']
         doctorFirstName:
           type: [string, 'null']
         doctorLastName:
@@ -1210,6 +1418,9 @@ components:
           type: string
         notes:
           type: string
+        consultationType:
+          type: string
+          enum: [offline, online]
 
     UpdateAppointmentBody:
       type: object
@@ -1243,6 +1454,13 @@ components:
           maximum: 5
         comment:
           type: [string, 'null']
+        verifiedPatient:
+          type: boolean
+        doctorReply:
+          type: [string, 'null']
+        doctorReplyAt:
+          type: [string, 'null']
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -1361,3 +1579,199 @@ components:
           enum: [patient, doctor, hospital_admin, super_admin]
         hospitalId:
           type: integer
+
+    SymptomCheckBody:
+      type: object
+      required: [symptoms]
+      properties:
+        symptoms:
+          type: string
+
+    SymptomCheckResponse:
+      type: object
+      required: [conditions, recommendedDepartment, advice]
+      properties:
+        conditions:
+          type: array
+          items:
+            type: object
+            required: [name, probability]
+            properties:
+              name:
+                type: string
+              probability:
+                type: string
+              description:
+                type: string
+        recommendedDepartment:
+          type: string
+        advice:
+          type: string
+
+    NotificationItem:
+      type: object
+      required: [id, userId, type, title, message, read, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        type:
+          type: string
+          enum: [appointment_confirmed, appointment_cancelled, appointment_reminder, payment_received, review_received, doctor_reply, general]
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        link:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationListResponse:
+      type: object
+      required: [notifications, total, unreadCount]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+        total:
+          type: integer
+        unreadCount:
+          type: integer
+
+    MedicalRecord:
+      type: object
+      required: [id, patientId, title, createdAt]
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: string
+        doctorId:
+          type: [integer, 'null']
+        appointmentId:
+          type: [integer, 'null']
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        fileUrl:
+          type: [string, 'null']
+        fileType:
+          type: [string, 'null']
+        diagnosis:
+          type: [string, 'null']
+        prescription:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateMedicalRecordBody:
+      type: object
+      required: [patientId, title]
+      properties:
+        patientId:
+          type: string
+        doctorId:
+          type: integer
+        appointmentId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        fileUrl:
+          type: string
+        fileType:
+          type: string
+        diagnosis:
+          type: string
+        prescription:
+          type: string
+
+    ReviewReplyBody:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+
+    EnhancedAnalytics:
+      type: object
+      required: [totalHospitals, totalDoctors, totalPatients, totalAppointments, totalRevenue, appointmentsByStatus, topDoctors, topDepartments, dailyTrends, recentAppointments]
+      properties:
+        totalHospitals:
+          type: integer
+        totalDoctors:
+          type: integer
+        totalPatients:
+          type: integer
+        totalAppointments:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingHospitalApprovals:
+          type: integer
+        appointmentsByStatus:
+          type: object
+          properties:
+            booked:
+              type: integer
+            cancelled:
+              type: integer
+            completed:
+              type: integer
+            pending:
+              type: integer
+        topDoctors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Doctor"
+        topDepartments:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+        dailyTrends:
+          type: array
+          items:
+            type: object
+            required: [date, count, revenue]
+            properties:
+              date:
+                type: string
+              count:
+                type: integer
+              revenue:
+                type: number
+        recentAppointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppointmentDetail"
+
+    CreatePaymentSessionBody:
+      type: object
+      required: [appointmentId]
+      properties:
+        appointmentId:
+          type: integer
+
+    PaymentSessionResponse:
+      type: object
+      required: [sessionId, url]
+      properties:
+        sessionId:
+          type: string
+        url:
+          type: string

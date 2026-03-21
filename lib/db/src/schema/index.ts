@@ -5,3 +5,5 @@ export * from "./doctors";
 export * from "./availability";
 export * from "./appointments";
 export * from "./reviews";
+export * from "./medical-records";
+export * from "./notifications";

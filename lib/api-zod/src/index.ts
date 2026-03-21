@@ -10,3 +10,4 @@ export interface AuthUser {
   hospitalId?: number | null;
   doctorId?: number | null;
 }
+export * from "./generated/types";

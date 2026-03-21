@@ -12,4 +12,6 @@ export interface CreateHospitalBody {
   phone?: string;
   email?: string;
   description?: string;
+  latitude?: number;
+  longitude?: number;
 }

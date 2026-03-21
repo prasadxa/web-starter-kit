@@ -19,6 +19,11 @@ export interface Review {
   rating: number;
   /** @nullable */
   comment?: string | null;
+  verifiedPatient?: boolean;
+  /** @nullable */
+  doctorReply?: string | null;
+  /** @nullable */
+  doctorReplyAt?: Date | null;
   createdAt: Date;
   /** @nullable */
   patientFirstName?: string | null;

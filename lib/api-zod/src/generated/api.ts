@@ -39,6 +39,44 @@ export const GetCurrentAuthUserResponse = zod.object({
 });
 
 /**
+ * Alias for `/auth/user`. Returns the same response shape.
+ * @summary Get the currently authenticated user (alias for /auth/user)
+ */
+export const GetCurrentUserHeader = zod.object({
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
+
+export const GetCurrentUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().email().nullable(),
+      firstName: zod.string().nullable(),
+      lastName: zod.string().nullable(),
+      profileImageUrl: zod.string().nullable(),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
+ * New user registration is handled via the OIDC provider (Replit). This endpoint redirects to the same OIDC authorization endpoint as `/login`. If the user does not have an account, the provider will prompt them to create one. On first login, a new user record is automatically created in the local database with role `patient`.
+
+ * @summary Register a new account (redirects to OIDC login/signup flow)
+ */
+export const BeginBrowserRegisterQueryParams = zod.object({
+  returnTo: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Relative path to redirect to after registration (must start with `\/`). Defaults to `\/`.",
+    ),
+});
+
+/**
  * @summary Start the browser OIDC login flow
  */
 export const BeginBrowserLoginQueryParams = zod.object({
@@ -135,7 +173,9 @@ export const GetHospitalsResponseItem = zod.object({
   email: zod.string().nullish(),
   description: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
-  createdAt: zod.string().optional(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  createdAt: zod.date().optional(),
 });
 export const GetHospitalsResponse = zod.array(GetHospitalsResponseItem);
 
@@ -148,6 +188,8 @@ export const CreateHospitalBody = zod.object({
   phone: zod.string().optional(),
   email: zod.string().optional(),
   description: zod.string().optional(),
+  latitude: zod.number().optional(),
+  longitude: zod.number().optional(),
 });
 
 /**
@@ -166,7 +208,9 @@ export const GetHospitalResponse = zod.object({
   email: zod.string().nullish(),
   description: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
-  createdAt: zod.string().optional(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  createdAt: zod.date().optional(),
 });
 
 /**
@@ -183,6 +227,8 @@ export const UpdateHospitalBody = zod.object({
   phone: zod.string().optional(),
   email: zod.string().optional(),
   description: zod.string().optional(),
+  latitude: zod.number().optional(),
+  longitude: zod.number().optional(),
 });
 
 export const UpdateHospitalResponse = zod.object({
@@ -194,7 +240,9 @@ export const UpdateHospitalResponse = zod.object({
   email: zod.string().nullish(),
   description: zod.string().nullish(),
   imageUrl: zod.string().nullish(),
-  createdAt: zod.string().optional(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  createdAt: zod.date().optional(),
 });
 
 /**
@@ -296,7 +344,10 @@ export const GetDoctorResponse = zod.object({
           .min(1)
           .max(getDoctorResponseRecentReviewsItemRatingMax),
         comment: zod.string().nullish(),
-        createdAt: zod.string(),
+        verifiedPatient: zod.boolean().optional(),
+        doctorReply: zod.string().nullish(),
+        doctorReplyAt: zod.date().nullish(),
+        createdAt: zod.date(),
         patientFirstName: zod.string().nullish(),
         patientLastName: zod.string().nullish(),
         patientProfileImageUrl: zod.string().nullish(),
@@ -368,7 +419,10 @@ export const GetDoctorReviewsResponse = zod.object({
         .min(1)
         .max(getDoctorReviewsResponseReviewsItemRatingMax),
       comment: zod.string().nullish(),
-      createdAt: zod.string(),
+      verifiedPatient: zod.boolean().optional(),
+      doctorReply: zod.string().nullish(),
+      doctorReplyAt: zod.date().nullish(),
+      createdAt: zod.date(),
       patientFirstName: zod.string().nullish(),
       patientLastName: zod.string().nullish(),
       patientProfileImageUrl: zod.string().nullish(),
@@ -387,14 +441,14 @@ export const GetDoctorAvailabilityParams = zod.object({
 });
 
 export const GetDoctorAvailabilityQueryParams = zod.object({
-  startDate: zod.string().optional(),
-  endDate: zod.string().optional(),
+  startDate: zod.date().optional(),
+  endDate: zod.date().optional(),
 });
 
 export const GetDoctorAvailabilityResponseItem = zod.object({
   id: zod.number(),
   doctorId: zod.number(),
-  date: zod.string(),
+  date: zod.date(),
   timeSlots: zod.array(zod.string()),
 });
 export const GetDoctorAvailabilityResponse = zod.array(
@@ -409,14 +463,14 @@ export const SetDoctorAvailabilityParams = zod.object({
 });
 
 export const SetDoctorAvailabilityBody = zod.object({
-  date: zod.string(),
+  date: zod.date(),
   timeSlots: zod.array(zod.string()),
 });
 
 export const SetDoctorAvailabilityResponse = zod.object({
   id: zod.number(),
   doctorId: zod.number(),
-  date: zod.string(),
+  date: zod.date(),
   timeSlots: zod.array(zod.string()),
 });
 
@@ -438,12 +492,19 @@ export const GetAppointmentsResponse = zod.object({
       patientId: zod.string(),
       doctorId: zod.number(),
       hospitalId: zod.number(),
-      date: zod.string(),
+      date: zod.date(),
       timeSlot: zod.string(),
       status: zod.enum(["booked", "cancelled", "completed", "pending"]),
       notes: zod.string().nullish(),
-      createdAt: zod.string().optional(),
+      createdAt: zod.date().optional(),
       hasReview: zod.boolean().optional(),
+      paymentStatus: zod
+        .enum(["pending", "paid", "failed", "refunded"])
+        .optional(),
+      paymentId: zod.string().nullish(),
+      stripeSessionId: zod.string().nullish(),
+      consultationType: zod.enum(["offline", "online"]).optional(),
+      meetingLink: zod.string().nullish(),
       doctorFirstName: zod.string().nullish(),
       doctorLastName: zod.string().nullish(),
       doctorProfileImageUrl: zod.string().nullish(),
@@ -465,9 +526,10 @@ export const GetAppointmentsResponse = zod.object({
 export const CreateAppointmentBody = zod.object({
   doctorId: zod.number(),
   hospitalId: zod.number(),
-  date: zod.string(),
+  date: zod.date(),
   timeSlot: zod.string(),
   notes: zod.string().optional(),
+  consultationType: zod.enum(["offline", "online"]).optional(),
 });
 
 /**
@@ -482,12 +544,17 @@ export const GetAppointmentResponse = zod.object({
   patientId: zod.string(),
   doctorId: zod.number(),
   hospitalId: zod.number(),
-  date: zod.string(),
+  date: zod.date(),
   timeSlot: zod.string(),
   status: zod.enum(["booked", "cancelled", "completed", "pending"]),
   notes: zod.string().nullish(),
-  createdAt: zod.string().optional(),
+  createdAt: zod.date().optional(),
   hasReview: zod.boolean().optional(),
+  paymentStatus: zod.enum(["pending", "paid", "failed", "refunded"]).optional(),
+  paymentId: zod.string().nullish(),
+  stripeSessionId: zod.string().nullish(),
+  consultationType: zod.enum(["offline", "online"]).optional(),
+  meetingLink: zod.string().nullish(),
   doctorFirstName: zod.string().nullish(),
   doctorLastName: zod.string().nullish(),
   doctorProfileImageUrl: zod.string().nullish(),
@@ -507,7 +574,7 @@ export const UpdateAppointmentParams = zod.object({
 
 export const UpdateAppointmentBody = zod.object({
   status: zod.enum(["booked", "cancelled", "completed", "pending"]).optional(),
-  date: zod.string().optional(),
+  date: zod.date().optional(),
   timeSlot: zod.string().optional(),
   notes: zod.string().optional(),
 });
@@ -517,12 +584,17 @@ export const UpdateAppointmentResponse = zod.object({
   patientId: zod.string(),
   doctorId: zod.number(),
   hospitalId: zod.number(),
-  date: zod.string(),
+  date: zod.date(),
   timeSlot: zod.string(),
   status: zod.enum(["booked", "cancelled", "completed", "pending"]),
   notes: zod.string().nullish(),
-  createdAt: zod.string().optional(),
+  createdAt: zod.date().optional(),
   hasReview: zod.boolean().optional(),
+  paymentStatus: zod.enum(["pending", "paid", "failed", "refunded"]).optional(),
+  paymentId: zod.string().nullish(),
+  stripeSessionId: zod.string().nullish(),
+  consultationType: zod.enum(["offline", "online"]).optional(),
+  meetingLink: zod.string().nullish(),
 });
 
 /**
@@ -618,12 +690,19 @@ export const GetAdminAnalyticsResponse = zod.object({
       patientId: zod.string(),
       doctorId: zod.number(),
       hospitalId: zod.number(),
-      date: zod.string(),
+      date: zod.date(),
       timeSlot: zod.string(),
       status: zod.enum(["booked", "cancelled", "completed", "pending"]),
       notes: zod.string().nullish(),
-      createdAt: zod.string().optional(),
+      createdAt: zod.date().optional(),
       hasReview: zod.boolean().optional(),
+      paymentStatus: zod
+        .enum(["pending", "paid", "failed", "refunded"])
+        .optional(),
+      paymentId: zod.string().nullish(),
+      stripeSessionId: zod.string().nullish(),
+      consultationType: zod.enum(["offline", "online"]).optional(),
+      meetingLink: zod.string().nullish(),
       doctorFirstName: zod.string().nullish(),
       doctorLastName: zod.string().nullish(),
       doctorProfileImageUrl: zod.string().nullish(),
@@ -671,4 +750,227 @@ export const UpdateAdminUserResponse = zod.object({
   role: zod.enum(["patient", "doctor", "hospital_admin", "super_admin"]),
   hospitalId: zod.number().nullish(),
   doctorId: zod.number().nullish(),
+});
+
+/**
+ * @summary AI-powered symptom checker
+ */
+export const CheckSymptomsBody = zod.object({
+  symptoms: zod.string(),
+});
+
+export const CheckSymptomsResponse = zod.object({
+  conditions: zod.array(
+    zod.object({
+      name: zod.string(),
+      probability: zod.string(),
+      description: zod.string().optional(),
+    }),
+  ),
+  recommendedDepartment: zod.string(),
+  advice: zod.string(),
+});
+
+/**
+ * @summary Get user notifications
+ */
+export const GetNotificationsQueryParams = zod.object({
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
+  unreadOnly: zod.coerce.boolean().optional(),
+});
+
+export const GetNotificationsResponse = zod.object({
+  notifications: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.string(),
+      type: zod.enum([
+        "appointment_confirmed",
+        "appointment_cancelled",
+        "appointment_reminder",
+        "payment_received",
+        "review_received",
+        "doctor_reply",
+        "general",
+      ]),
+      title: zod.string(),
+      message: zod.string(),
+      read: zod.boolean(),
+      link: zod.string().nullish(),
+      createdAt: zod.date(),
+    }),
+  ),
+  total: zod.number(),
+  unreadCount: zod.number(),
+});
+
+/**
+ * @summary Mark a notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get medical records for a patient
+ */
+export const GetMedicalRecordsQueryParams = zod.object({
+  patientId: zod.coerce.string().optional(),
+});
+
+export const GetMedicalRecordsResponseItem = zod.object({
+  id: zod.number(),
+  patientId: zod.string(),
+  doctorId: zod.number().nullish(),
+  appointmentId: zod.number().nullish(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  fileUrl: zod.string().nullish(),
+  fileType: zod.string().nullish(),
+  diagnosis: zod.string().nullish(),
+  prescription: zod.string().nullish(),
+  createdAt: zod.date(),
+});
+export const GetMedicalRecordsResponse = zod.array(
+  GetMedicalRecordsResponseItem,
+);
+
+/**
+ * @summary Create a medical record
+ */
+export const CreateMedicalRecordBody = zod.object({
+  patientId: zod.string(),
+  doctorId: zod.number().optional(),
+  appointmentId: zod.number().optional(),
+  title: zod.string(),
+  description: zod.string().optional(),
+  fileUrl: zod.string().optional(),
+  fileType: zod.string().optional(),
+  diagnosis: zod.string().optional(),
+  prescription: zod.string().optional(),
+});
+
+/**
+ * @summary Doctor replies to a review
+ */
+export const ReplyToReviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReplyToReviewBody = zod.object({
+  reply: zod.string(),
+});
+
+export const replyToReviewResponseRatingMax = 5;
+
+export const ReplyToReviewResponse = zod.object({
+  id: zod.number(),
+  patientId: zod.string(),
+  doctorId: zod.number(),
+  appointmentId: zod.number().nullish(),
+  rating: zod.number().min(1).max(replyToReviewResponseRatingMax),
+  comment: zod.string().nullish(),
+  verifiedPatient: zod.boolean().optional(),
+  doctorReply: zod.string().nullish(),
+  doctorReplyAt: zod.date().nullish(),
+  createdAt: zod.date(),
+  patientFirstName: zod.string().nullish(),
+  patientLastName: zod.string().nullish(),
+  patientProfileImageUrl: zod.string().nullish(),
+});
+
+/**
+ * @summary Get enhanced analytics with revenue and trends
+ */
+export const GetEnhancedAnalyticsResponse = zod.object({
+  totalHospitals: zod.number(),
+  totalDoctors: zod.number(),
+  totalPatients: zod.number(),
+  totalAppointments: zod.number(),
+  totalRevenue: zod.number(),
+  pendingHospitalApprovals: zod.number().optional(),
+  appointmentsByStatus: zod.object({
+    booked: zod.number().optional(),
+    cancelled: zod.number().optional(),
+    completed: zod.number().optional(),
+    pending: zod.number().optional(),
+  }),
+  topDoctors: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.string(),
+      hospitalId: zod.number(),
+      departmentId: zod.number(),
+      experience: zod.number(),
+      consultationFee: zod.number(),
+      averageRating: zod.number(),
+      totalReviews: zod.number(),
+      bio: zod.string().nullish(),
+      specialization: zod.string().nullish(),
+      qualification: zod.string().nullish(),
+      isTopRated: zod.boolean().optional(),
+      nextAvailableSlot: zod.string().nullish(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      profileImageUrl: zod.string().nullish(),
+      email: zod.string().nullish(),
+      hospitalName: zod.string().nullish(),
+      departmentName: zod.string().nullish(),
+    }),
+  ),
+  topDepartments: zod.array(
+    zod.object({
+      name: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  dailyTrends: zod.array(
+    zod.object({
+      date: zod.string(),
+      count: zod.number(),
+      revenue: zod.number(),
+    }),
+  ),
+  recentAppointments: zod.array(
+    zod.object({
+      id: zod.number(),
+      patientId: zod.string(),
+      doctorId: zod.number(),
+      hospitalId: zod.number(),
+      date: zod.date(),
+      timeSlot: zod.string(),
+      status: zod.enum(["booked", "cancelled", "completed", "pending"]),
+      notes: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      hasReview: zod.boolean().optional(),
+      paymentStatus: zod
+        .enum(["pending", "paid", "failed", "refunded"])
+        .optional(),
+      paymentId: zod.string().nullish(),
+      stripeSessionId: zod.string().nullish(),
+      consultationType: zod.enum(["offline", "online"]).optional(),
+      meetingLink: zod.string().nullish(),
+      doctorFirstName: zod.string().nullish(),
+      doctorLastName: zod.string().nullish(),
+      doctorProfileImageUrl: zod.string().nullish(),
+      doctorSpecialization: zod.string().nullish(),
+      hospitalName: zod.string().nullish(),
+      departmentName: zod.string().nullish(),
+      patientFirstName: zod.string().nullish(),
+      patientLastName: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create a Stripe checkout session for an appointment
+ */
+export const CreatePaymentSessionBody = zod.object({
+  appointmentId: zod.number(),
+});
+
+export const CreatePaymentSessionResponse = zod.object({
+  sessionId: zod.string(),
+  url: zod.string(),
 });

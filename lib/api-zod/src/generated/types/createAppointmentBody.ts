@@ -5,6 +5,7 @@
  * MediBook Multi-Hospital Doctor Appointment System API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateAppointmentBodyConsultationType } from "./createAppointmentBodyConsultationType";
 
 export interface CreateAppointmentBody {
   doctorId: number;
@@ -12,4 +13,5 @@ export interface CreateAppointmentBody {
   date: Date;
   timeSlot: string;
   notes?: string;
+  consultationType?: CreateAppointmentBodyConsultationType;
 }
