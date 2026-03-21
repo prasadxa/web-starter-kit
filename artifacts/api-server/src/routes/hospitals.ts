@@ -33,7 +33,7 @@ router.post("/hospitals", async (req: Request, res: Response) => {
 });
 
 router.get("/hospitals/:id", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const [hospital] = await db.select().from(hospitalsTable).where(eq(hospitalsTable.id, id));
   if (!hospital) {
     res.status(404).json({ error: "Hospital not found" });
@@ -47,7 +47,7 @@ router.patch("/hospitals/:id", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const parsed = UpdateHospitalBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });

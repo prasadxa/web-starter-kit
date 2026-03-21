@@ -161,7 +161,7 @@ router.get("/appointments/:id", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
 
   const [row] = await db
     .select({
@@ -183,6 +183,19 @@ router.get("/appointments/:id", async (req: Request, res: Response) => {
     return;
   }
 
+  const userId = req.user.id;
+  const role = req.user.role;
+  const appt = row.appointment;
+  const canView =
+    role === "super_admin" ||
+    appt.patientId === userId ||
+    (role === "doctor" && req.user.doctorId === appt.doctorId) ||
+    (role === "hospital_admin" && req.user.hospitalId === appt.hospitalId);
+  if (!canView) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   res.json(GetAppointmentResponse.parse(serializeDates({
     ...row.appointment,
     doctorFirstName: row.doctorUser?.firstName ?? null,
@@ -201,7 +214,7 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const parsed = UpdateAppointmentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });
@@ -211,6 +224,18 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
   const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, id));
   if (!existing) {
     res.status(404).json({ error: "Appointment not found" });
+    return;
+  }
+
+  const userId = req.user.id;
+  const role = req.user.role;
+  const canEdit =
+    role === "super_admin" ||
+    (role === "patient" && existing.patientId === userId) ||
+    (role === "doctor" && req.user.doctorId === existing.doctorId) ||
+    (role === "hospital_admin" && req.user.hospitalId === existing.hospitalId);
+  if (!canEdit) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

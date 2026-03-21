@@ -18,6 +18,7 @@ import {
   useGetDoctorAvailability,
   useGetHospitals,
   useUpdateHospital,
+  useGetDoctors,
   getGetAppointmentsQueryKey,
   getGetAdminAnalyticsQueryKey,
   getGetHospitalsQueryKey
@@ -343,13 +344,140 @@ function SuperAdminDashboard() {
 }
 
 // ----------------------------------------------------------------------
-// HOSPITAL ADMIN DASHBOARD (Placeholder for completeness)
+// HOSPITAL ADMIN DASHBOARD
 // ----------------------------------------------------------------------
 function HospitalAdminDashboard({ hospitalId }: { hospitalId: number }) {
+  const { data: apptsData, isLoading: apptsLoading } = useGetAppointments({ hospitalId, limit: 100 });
+  const { data: hospitalsData } = useGetHospitals();
+  const { data: doctorsData } = useGetDoctors({ hospitalId });
+  const updateAppointment = useUpdateAppointment();
+  const updateHospital = useUpdateHospital();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const hospital = hospitalsData?.find((h: { id: number }) => h.id === hospitalId);
+
+  const handleUpdateStatus = (id: number, status: 'booked' | 'cancelled' | 'completed') => {
+    updateAppointment.mutate({ id, data: { status } }, {
+      onSuccess: () => {
+        toast({ title: `Appointment marked as ${status}` });
+        queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+      }
+    });
+  };
+
+  const appointments = apptsData?.appointments ?? [];
+  const upcomingAppts = appointments.filter(a => a.status === 'booked' || a.status === 'pending');
+  const completedAppts = appointments.filter(a => a.status === 'completed');
+  const cancelledAppts = appointments.filter(a => a.status === 'cancelled');
+  const doctors = (doctorsData as any)?.doctors ?? [];
+
+  const stats = [
+    { label: "Total Doctors", value: doctors.length, icon: <UserPlus className="w-5 h-5 text-primary" /> },
+    { label: "Upcoming", value: upcomingAppts.length, icon: <Calendar className="w-5 h-5 text-blue-500" /> },
+    { label: "Completed", value: completedAppts.length, icon: <CheckCircle className="w-5 h-5 text-emerald-500" /> },
+    { label: "Cancelled", value: cancelledAppts.length, icon: <XCircle className="w-5 h-5 text-destructive" /> },
+  ];
+
   return (
-    <div className="text-center py-20 bg-card rounded-3xl border border-border/50">
-      <h2 className="text-2xl font-bold mb-4">Hospital Management</h2>
-      <p className="text-muted-foreground">Hospital Admin features (add doctors, manage departments) would go here.</p>
+    <div className="space-y-8">
+      {hospital && (
+        <div className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h2 className="text-2xl font-bold">{hospital.name}</h2>
+              <p className="text-muted-foreground flex items-center gap-1.5 mt-1"><MapPin className="w-4 h-4" /> {hospital.location}</p>
+              <span className={`mt-2 inline-block text-xs px-3 py-1 rounded-full font-medium ${hospital.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {hospital.approved ? 'Approved' : 'Pending Approval'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {stats.map(s => (
+          <div key={s.label} className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">{s.icon}<span className="text-sm text-muted-foreground">{s.label}</span></div>
+            <p className="text-3xl font-bold">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <Tabs defaultValue="appointments" className="w-full">
+        <TabsList className="mb-6 bg-muted/50 p-1 border border-border/50 rounded-xl">
+          <TabsTrigger value="appointments" className="rounded-lg">All Appointments</TabsTrigger>
+          <TabsTrigger value="doctors" className="rounded-lg">Doctors</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="appointments" className="space-y-4">
+          {apptsLoading && <div className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" /></div>}
+          {!apptsLoading && appointments.length === 0 && (
+            <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed">
+              <p className="text-muted-foreground">No appointments at your hospital yet.</p>
+            </div>
+          )}
+          {appointments.map(appt => (
+            <div key={appt.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+              <div className="flex gap-4 items-center">
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex flex-col items-center justify-center text-primary shrink-0">
+                  <span className="font-bold text-base leading-none">{format(new Date(appt.date), 'dd')}</span>
+                  <span className="text-xs uppercase">{format(new Date(appt.date), 'MMM')}</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Dr. {appt.doctorFirstName} {appt.doctorLastName}</h3>
+                  <p className="text-muted-foreground text-sm flex items-center gap-1"><Clock className="w-3 h-3" /> {appt.timeSlot}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    appt.status === 'booked' ? 'bg-blue-100 text-blue-700' :
+                    appt.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                    appt.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                  }`}>{appt.status}</span>
+                </div>
+              </div>
+              {appt.status === 'booked' && (
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="outline" className="rounded-xl text-emerald-600 border-emerald-600 hover:bg-emerald-50" onClick={() => handleUpdateStatus(appt.id, 'completed')}>
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
+                  </Button>
+                  <Button size="sm" variant="destructive" className="rounded-xl" onClick={() => handleUpdateStatus(appt.id, 'cancelled')}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="doctors" className="space-y-4">
+          {doctors.length === 0 && (
+            <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed">
+              <p className="text-muted-foreground">No doctors assigned to your hospital yet.</p>
+            </div>
+          )}
+          {doctors.map((doc: any) => (
+            <div key={doc.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm flex justify-between items-center gap-4">
+              <div className="flex gap-4 items-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                  {doc.firstName?.[0] ?? 'D'}
+                </div>
+                <div>
+                  <h3 className="font-semibold">Dr. {doc.firstName} {doc.lastName}</h3>
+                  <p className="text-sm text-muted-foreground">{doc.specialization}</p>
+                  <div className="flex items-center gap-1 text-amber-500 text-sm">
+                    <Star className="w-3.5 h-3.5 fill-amber-500" />
+                    <span>{(doc.averageRating ?? 0).toFixed(1)}</span>
+                    <span className="text-muted-foreground">({doc.totalReviews ?? 0} reviews)</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-semibold text-primary">₹{doc.consultationFee}</p>
+                <p className="text-xs text-muted-foreground">{doc.experience} yr exp.</p>
+              </div>
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

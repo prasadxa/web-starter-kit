@@ -165,7 +165,7 @@ router.post("/doctors", async (req: Request, res: Response) => {
 });
 
 router.get("/doctors/:id", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
 
   const [row] = await db
     .select({
@@ -234,7 +234,7 @@ router.patch("/doctors/:id", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const parsed = UpdateDoctorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });
@@ -249,7 +249,7 @@ router.patch("/doctors/:id", async (req: Request, res: Response) => {
 });
 
 router.get("/doctors/:id/reviews", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const offset = (page - 1) * limit;
@@ -282,7 +282,7 @@ router.get("/doctors/:id/reviews", async (req: Request, res: Response) => {
 });
 
 router.get("/doctors/:id/availability", async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
   const today = new Date().toISOString().split("T")[0];
@@ -306,7 +306,7 @@ router.post("/doctors/:id/availability", async (req: Request, res: Response) => 
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   const parsed = SetDoctorAvailabilityBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation error" });

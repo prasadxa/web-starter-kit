@@ -15,6 +15,10 @@ function requireSuperAdmin(req: Request, res: Response): boolean {
     res.status(401).json({ error: "Unauthorized" });
     return false;
   }
+  if (req.user.role !== "super_admin") {
+    res.status(403).json({ error: "Forbidden: super_admin role required" });
+    return false;
+  }
   return true;
 }
 
