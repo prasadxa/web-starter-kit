@@ -1,0 +1,167 @@
+You are improving an existing full-stack "Multi-Hospital Doctor Appointment System" built using React.js (frontend), Django REST Framework (backend), and PostgreSQL.
+
+Upgrade the system by adding the following advanced integrations and features. Ensure all features are production-ready, modular, and properly integrated.
+
+--------------------------------------------------
+
+1. PAYMENT INTEGRATION
+
+Integrate Razorpay payment gateway.
+
+Features:
+- Allow patients to pay while booking appointments
+- Add "payment_status" field in Appointments table (pending, paid, failed)
+- Only confirm appointment after successful payment
+- Store Razorpay order_id and payment_id
+- Handle payment verification securely in backend
+
+--------------------------------------------------
+
+2. EMAIL & SMS NOTIFICATIONS
+
+Integrate:
+- SendGrid for email notifications
+- Twilio for SMS notifications
+
+Features:
+- Send confirmation after booking
+- Send reminder 1 hour before appointment
+- Send cancellation alerts
+- Use background jobs (Celery + Redis recommended)
+
+--------------------------------------------------
+
+3. GOOGLE MAPS INTEGRATION
+
+Features:
+- Show hospital locations on map
+- Add "Get Directions" button
+- Filter doctors by nearby hospitals
+- Use latitude and longitude fields in Hospital model
+
+--------------------------------------------------
+
+4. REVIEW SYSTEM (ENHANCED)
+
+Enhance existing reviews:
+
+- Add "verified_patient" flag
+- Only patients who completed appointment can review
+- Doctors table should auto-update:
+  - average_rating
+  - total_reviews
+- Display top reviews first
+- Allow doctor replies to reviews
+
+--------------------------------------------------
+
+5. AI SYMPTOM CHECKER
+
+Integrate OpenAI API.
+
+Features:
+- User enters symptoms in text input
+- System suggests:
+  - Possible conditions
+  - Recommended department
+- Show suggestion before department selection step
+
+--------------------------------------------------
+
+6. VIDEO CONSULTATION
+
+Add video consultation using WebRTC or Agora.
+
+Features:
+- Generate secure meeting link after booking
+- Only available for "online consultation" type appointments
+- Add "consultation_type" field (online/offline)
+
+--------------------------------------------------
+
+7. PUSH NOTIFICATIONS
+
+Integrate Firebase Cloud Messaging.
+
+Features:
+- Appointment reminders
+- Doctor availability alerts
+- New offers or updates
+
+--------------------------------------------------
+
+8. ANALYTICS DASHBOARD (ADMIN)
+
+Create dashboard for Super Admin:
+
+- Total appointments
+- Revenue generated
+- Most booked departments
+- Top-rated doctors
+- Daily/weekly trends (use charts)
+
+--------------------------------------------------
+
+9. ELECTRONIC HEALTH RECORDS (EHR)
+
+Add patient medical records:
+
+- Upload prescriptions (PDF/image)
+- Store medical history
+- Doctor can view patient history
+
+--------------------------------------------------
+
+10. SECURITY IMPROVEMENTS
+
+- Add JWT refresh tokens
+- Implement role-based access control properly
+- Validate all API inputs
+- Protect against double booking
+
+--------------------------------------------------
+
+11. FRONTEND IMPROVEMENTS
+
+- Add payment UI
+- Add map UI for hospitals
+- Add AI symptom checker input UI
+- Improve doctor cards:
+  - Show badges (Top Rated, Most Booked)
+- Add notification system UI
+
+--------------------------------------------------
+
+12. DATABASE UPDATES
+
+Modify schema:
+
+Appointments:
+- payment_status
+- payment_id
+- consultation_type
+
+Hospitals:
+- latitude
+- longitude
+
+Reviews:
+- verified_patient
+- doctor_reply
+
+--------------------------------------------------
+
+13. FINAL REQUIREMENTS
+
+- Keep code modular and scalable
+- Ensure frontend and backend are fully connected
+- Add proper error handling
+- Use environment variables for API keys
+- Add comments where needed
+- Ensure production-level code quality
+
+--------------------------------------------------
+
+GOAL:
+
+Upgrade the platform into a startup-level SaaS product with payments, AI, notifications, maps, and telemedicine capabilities.

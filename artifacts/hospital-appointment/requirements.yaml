@@ -1,0 +1,16 @@
+packages:
+  "date-fns": "For date formatting and manipulation"
+  "recharts": "For admin analytics dashboard"
+  "@workspace/replit-auth-web": "workspace:*"
+
+images:
+  - path: "artifacts/hospital-appointment/public/images/hero-medical.png"
+    description: "A bright, clean, modern hospital corridor with soft blue and green lighting, medical professionals in the background slightly blurred, high quality, professional"
+    aspect_ratio: "16:9"
+  - path: "artifacts/hospital-appointment/public/images/pattern-bg.png"
+    description: "Subtle abstract geometric pattern with soft medical crosses and waves in light blue on a white background, minimal, clean"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using Replit Auth for authentication
+  - Generated API hooks from @workspace/api-client-react are assumed to be ready

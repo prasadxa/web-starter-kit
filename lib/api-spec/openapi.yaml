@@ -1,15 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MediBook Multi-Hospital Doctor Appointment System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: departments
+    description: Department operations
+  - name: hospitals
+    description: Hospital operations
+  - name: doctors
+    description: Doctor operations
+  - name: appointments
+    description: Appointment operations
+  - name: reviews
+    description: Review operations
+  - name: availability
+    description: Doctor availability operations
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
@@ -24,7 +39,720 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          description: Relative path to redirect to after login (must start with `/`). Defaults to `/`.
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the `returnTo` path on success (defaults to `/`) or `/api/login` on failure.
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  /departments:
+    get:
+      operationId: getDepartments
+      tags: [departments]
+      summary: List all departments
+      responses:
+        "200":
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Department"
+    post:
+      operationId: createDepartment
+      tags: [departments]
+      summary: Create a department (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepartmentBody"
+      responses:
+        "201":
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /hospitals:
+    get:
+      operationId: getHospitals
+      tags: [hospitals]
+      summary: List all approved hospitals
+      parameters:
+        - name: approved
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of hospitals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Hospital"
+    post:
+      operationId: createHospital
+      tags: [hospitals]
+      summary: Register a new hospital
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHospitalBody"
+      responses:
+        "201":
+          description: Hospital registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hospital"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /hospitals/{id}:
+    get:
+      operationId: getHospital
+      tags: [hospitals]
+      summary: Get hospital by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hospital details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hospital"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateHospital
+      tags: [hospitals]
+      summary: Update hospital (approve/details)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateHospitalBody"
+      responses:
+        "200":
+          description: Hospital updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hospital"
+
+  /doctors:
+    get:
+      operationId: getDoctors
+      tags: [doctors]
+      summary: List doctors with optional filters
+      parameters:
+        - name: departmentId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: hospitalId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [rating, reviews, availability, score]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: minRating
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: maxFee
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: availableToday
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated list of doctors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorListResponse"
+    post:
+      operationId: createDoctor
+      tags: [doctors]
+      summary: Create a doctor profile (hospital admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDoctorBody"
+      responses:
+        "201":
+          description: Doctor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /doctors/{id}:
+    get:
+      operationId: getDoctor
+      tags: [doctors]
+      summary: Get doctor profile by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Doctor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateDoctor
+      tags: [doctors]
+      summary: Update doctor profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDoctorBody"
+      responses:
+        "200":
+          description: Doctor updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+
+  /doctors/{id}/reviews:
+    get:
+      operationId: getDoctorReviews
+      tags: [doctors]
+      summary: Get reviews for a doctor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewListResponse"
+
+  /doctors/{id}/availability:
+    get:
+      operationId: getDoctorAvailability
+      tags: [availability]
+      summary: Get availability slots for a doctor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Availability slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Availability"
+    post:
+      operationId: setDoctorAvailability
+      tags: [availability]
+      summary: Set availability slots for a doctor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetAvailabilityBody"
+      responses:
+        "200":
+          description: Availability set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Availability"
+
+  /appointments:
+    get:
+      operationId: getAppointments
+      tags: [appointments]
+      summary: List appointments for the current user
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [booked, cancelled, completed, pending]
+        - name: doctorId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: hospitalId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentListResponse"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Book a new appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentBody"
+      responses:
+        "201":
+          description: Appointment booked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Validation error or double booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Time slot already booked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /appointments/{id}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Get appointment by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateAppointment
+      tags: [appointments]
+      summary: Update appointment status (cancel, complete, reschedule)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentBody"
+      responses:
+        "200":
+          description: Appointment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+        "400":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /reviews:
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Submit a review for a completed appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBody"
+      responses:
+        "201":
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Review already submitted for this appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /users/profile:
+    get:
+      operationId: getUserProfile
+      tags: [Auth]
+      summary: Get the current user's app profile (role, etc.)
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateUserProfile
+      tags: [Auth]
+      summary: Update user profile (role, hospital assignment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserProfileBody"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /admin/analytics:
+    get:
+      operationId: getAdminAnalytics
+      tags: [admin]
+      summary: Get platform analytics (super admin only)
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAnalytics"
+
+  /admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [admin]
+      summary: List all users (super admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateAdminUser
+      tags: [admin]
+      summary: Update a user's role (super admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateUserBody"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +762,566 @@ components:
       required:
         - status
 
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Department:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        icon:
+          type: [string, 'null']
+
+    CreateDepartmentBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+
+    Hospital:
+      type: object
+      required: [id, name, location, approved]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        location:
+          type: string
+        approved:
+          type: boolean
+        phone:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+        description:
+          type: [string, 'null']
+        imageUrl:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateHospitalBody:
+      type: object
+      required: [name, location]
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        description:
+          type: string
+
+    UpdateHospitalBody:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        approved:
+          type: boolean
+        phone:
+          type: string
+        email:
+          type: string
+        description:
+          type: string
+
+    Doctor:
+      type: object
+      required: [id, userId, hospitalId, departmentId, experience, consultationFee, averageRating, totalReviews]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        hospitalId:
+          type: integer
+        departmentId:
+          type: integer
+        experience:
+          type: integer
+        consultationFee:
+          type: number
+        averageRating:
+          type: number
+        totalReviews:
+          type: integer
+        bio:
+          type: [string, 'null']
+        specialization:
+          type: [string, 'null']
+        qualification:
+          type: [string, 'null']
+        isTopRated:
+          type: boolean
+        nextAvailableSlot:
+          type: [string, 'null']
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+        hospitalName:
+          type: [string, 'null']
+        departmentName:
+          type: [string, 'null']
+
+    DoctorDetail:
+      type: object
+      required: [id, userId, hospitalId, departmentId, experience, consultationFee, averageRating, totalReviews]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        hospitalId:
+          type: integer
+        departmentId:
+          type: integer
+        experience:
+          type: integer
+        consultationFee:
+          type: number
+        averageRating:
+          type: number
+        totalReviews:
+          type: integer
+        bio:
+          type: [string, 'null']
+        specialization:
+          type: [string, 'null']
+        qualification:
+          type: [string, 'null']
+        isTopRated:
+          type: boolean
+        nextAvailableSlot:
+          type: [string, 'null']
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+        hospitalName:
+          type: [string, 'null']
+        departmentName:
+          type: [string, 'null']
+        recentReviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+
+    DoctorListResponse:
+      type: object
+      required: [doctors, total, page, limit]
+      properties:
+        doctors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Doctor"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateDoctorBody:
+      type: object
+      required: [userId, hospitalId, departmentId, experience, consultationFee]
+      properties:
+        userId:
+          type: string
+        hospitalId:
+          type: integer
+        departmentId:
+          type: integer
+        experience:
+          type: integer
+        consultationFee:
+          type: number
+        bio:
+          type: string
+        specialization:
+          type: string
+        qualification:
+          type: string
+
+    UpdateDoctorBody:
+      type: object
+      properties:
+        experience:
+          type: integer
+        consultationFee:
+          type: number
+        bio:
+          type: string
+        specialization:
+          type: string
+        qualification:
+          type: string
+
+    Availability:
+      type: object
+      required: [id, doctorId, date, timeSlots]
+      properties:
+        id:
+          type: integer
+        doctorId:
+          type: integer
+        date:
+          type: string
+          format: date
+        timeSlots:
+          type: array
+          items:
+            type: string
+
+    SetAvailabilityBody:
+      type: object
+      required: [date, timeSlots]
+      properties:
+        date:
+          type: string
+          format: date
+        timeSlots:
+          type: array
+          items:
+            type: string
+
+    Appointment:
+      type: object
+      required: [id, patientId, doctorId, hospitalId, date, timeSlot, status]
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: string
+        doctorId:
+          type: integer
+        hospitalId:
+          type: integer
+        date:
+          type: string
+          format: date
+        timeSlot:
+          type: string
+        status:
+          type: string
+          enum: [booked, cancelled, completed, pending]
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        hasReview:
+          type: boolean
+
+    AppointmentDetail:
+      type: object
+      required: [id, patientId, doctorId, hospitalId, date, timeSlot, status]
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: string
+        doctorId:
+          type: integer
+        hospitalId:
+          type: integer
+        date:
+          type: string
+          format: date
+        timeSlot:
+          type: string
+        status:
+          type: string
+          enum: [booked, cancelled, completed, pending]
+        notes:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        hasReview:
+          type: boolean
+        doctorFirstName:
+          type: [string, 'null']
+        doctorLastName:
+          type: [string, 'null']
+        doctorProfileImageUrl:
+          type: [string, 'null']
+        doctorSpecialization:
+          type: [string, 'null']
+        hospitalName:
+          type: [string, 'null']
+        departmentName:
+          type: [string, 'null']
+        patientFirstName:
+          type: [string, 'null']
+        patientLastName:
+          type: [string, 'null']
+
+    AppointmentListResponse:
+      type: object
+      required: [appointments, total, page, limit]
+      properties:
+        appointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppointmentDetail"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateAppointmentBody:
+      type: object
+      required: [doctorId, hospitalId, date, timeSlot]
+      properties:
+        doctorId:
+          type: integer
+        hospitalId:
+          type: integer
+        date:
+          type: string
+          format: date
+        timeSlot:
+          type: string
+        notes:
+          type: string
+
+    UpdateAppointmentBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [booked, cancelled, completed, pending]
+        date:
+          type: string
+          format: date
+        timeSlot:
+          type: string
+        notes:
+          type: string
+
+    Review:
+      type: object
+      required: [id, patientId, doctorId, rating, createdAt]
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: string
+        doctorId:
+          type: integer
+        appointmentId:
+          type: [integer, 'null']
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        patientFirstName:
+          type: [string, 'null']
+        patientLastName:
+          type: [string, 'null']
+        patientProfileImageUrl:
+          type: [string, 'null']
+
+    ReviewListResponse:
+      type: object
+      required: [reviews, total, page, limit]
+      properties:
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateReviewBody:
+      type: object
+      required: [doctorId, rating]
+      properties:
+        doctorId:
+          type: integer
+        appointmentId:
+          type: integer
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+
+    UserProfile:
+      type: object
+      required: [id, replitUserId, role]
+      properties:
+        id:
+          type: integer
+        replitUserId:
+          type: string
+        email:
+          type: [string, 'null']
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+        role:
+          type: string
+          enum: [patient, doctor, hospital_admin, super_admin]
+        hospitalId:
+          type: [integer, 'null']
+        doctorId:
+          type: [integer, 'null']
+
+    UpdateUserProfileBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [patient, doctor, hospital_admin, super_admin]
+        hospitalId:
+          type: integer
+
+    AdminAnalytics:
+      type: object
+      required: [totalHospitals, totalDoctors, totalPatients, totalAppointments, pendingHospitalApprovals, appointmentsByStatus, topDoctors, recentAppointments]
+      properties:
+        totalHospitals:
+          type: integer
+        totalDoctors:
+          type: integer
+        totalPatients:
+          type: integer
+        totalAppointments:
+          type: integer
+        pendingHospitalApprovals:
+          type: integer
+        appointmentsByStatus:
+          type: object
+          properties:
+            booked:
+              type: integer
+            cancelled:
+              type: integer
+            completed:
+              type: integer
+            pending:
+              type: integer
+        topDoctors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Doctor"
+        recentAppointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppointmentDetail"
+
+    AdminUpdateUserBody:
+      type: object
+      required: [userId, role]
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+          enum: [patient, doctor, hospital_admin, super_admin]
+        hospitalId:
+          type: integer
