@@ -86,10 +86,52 @@ async function seed() {
 
   const today = new Date();
 
+  // Seed admin users first
+  await db.insert(usersTable).values({
+    id: "seed-super-admin",
+    replitUserId: "seed-super-admin",
+    firstName: "Super",
+    lastName: "Admin",
+    email: "superadmin@medibook.demo",
+    role: "super_admin",
+  }).onConflictDoNothing();
+
+  await db.insert(usersTable).values({
+    id: "seed-hospital-admin-1",
+    replitUserId: "seed-hospital-admin-1",
+    firstName: "Hospital",
+    lastName: "Manager",
+    email: "admin@citymedical.demo",
+    role: "hospital_admin",
+    hospitalId: hosps[0].id,
+  }).onConflictDoNothing();
+
+  // Seed sample patients
+  const patientData = [
+    { id: "seed-patient-1", firstName: "Alice", lastName: "Thompson", email: "alice.thompson@example.com" },
+    { id: "seed-patient-2", firstName: "Bob", lastName: "Williams", email: "bob.williams@example.com" },
+    { id: "seed-patient-3", firstName: "Carol", lastName: "Davis", email: "carol.davis@example.com" },
+  ];
+
+  for (const p of patientData) {
+    await db.insert(usersTable).values({ id: p.id, replitUserId: p.id, firstName: p.firstName, lastName: p.lastName, email: p.email, role: "patient" }).onConflictDoNothing();
+  }
+
+  // Seed doctor users and link them to doctorsTable
   for (let i = 0; i < doctorData.length; i++) {
     const dData = doctorData[i];
     const name = doctorNames[i];
     const fakeUserId = `seed-doctor-${i + 1}`;
+
+    await db.insert(usersTable).values({
+      id: fakeUserId,
+      replitUserId: fakeUserId,
+      firstName: name.first,
+      lastName: name.last,
+      email: `${name.first.toLowerCase()}.${name.last.toLowerCase()}@medibook.demo`,
+      role: "doctor",
+      hospitalId: dData.hospitalId,
+    }).onConflictDoNothing();
 
     const [doctor] = await db
       .insert(doctorsTable)
@@ -112,6 +154,11 @@ async function seed() {
 
     if (!doctor) continue;
 
+    await db
+      .update(usersTable)
+      .set({ doctorId: doctor.id })
+      .where(eq(usersTable.id, fakeUserId));
+
     for (let d = 0; d < 7; d++) {
       const date = new Date(today);
       date.setDate(today.getDate() + d);
@@ -125,17 +172,6 @@ async function seed() {
         .values({ doctorId: doctor.id, date: dateStr, timeSlots: slots })
         .onConflictDoNothing();
     }
-  }
-
-  // Seed sample patients
-  const patientData = [
-    { id: "seed-patient-1", firstName: "Alice", lastName: "Thompson", email: "alice.thompson@example.com" },
-    { id: "seed-patient-2", firstName: "Bob", lastName: "Williams", email: "bob.williams@example.com" },
-    { id: "seed-patient-3", firstName: "Carol", lastName: "Davis", email: "carol.davis@example.com" },
-  ];
-
-  for (const p of patientData) {
-    await db.insert(usersTable).values({ id: p.id, firstName: p.firstName, lastName: p.lastName, email: p.email, role: "patient" }).onConflictDoNothing();
   }
 
   // Fetch seeded doctors

@@ -207,10 +207,17 @@ router.get("/appointments/:id", async (req: Request, res: Response) => {
   const userId = req.user.id;
   const role = req.user.role;
   const appt = row.appointment;
+
+  let isDoctorOwner = false;
+  if (role === "doctor") {
+    const [ownDoc] = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, userId)).limit(1);
+    isDoctorOwner = !!ownDoc && ownDoc.id === appt.doctorId;
+  }
+
   const canView =
     role === "super_admin" ||
     appt.patientId === userId ||
-    (role === "doctor" && req.user.doctorId === appt.doctorId) ||
+    isDoctorOwner ||
     (role === "hospital_admin" && req.user.hospitalId === appt.hospitalId);
   if (!canView) {
     res.status(403).json({ error: "Forbidden" });

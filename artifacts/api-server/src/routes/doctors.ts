@@ -158,16 +158,32 @@ router.post("/doctors", async (req: Request, res: Response) => {
       return;
     }
   }
+  const targetUser = await db.select().from(usersTable).where(eq(usersTable.id, parsed.data.userId)).limit(1);
+  if (!targetUser[0]) {
+    res.status(404).json({ error: "User not found for the given userId" });
+    return;
+  }
+
   const [doctor] = await db.insert(doctorsTable).values(parsed.data).returning();
-  const user = await db.select().from(usersTable).where(eq(usersTable.id, doctor.userId)).limit(1);
+
+  await db
+    .update(usersTable)
+    .set({
+      role: "doctor",
+      doctorId: doctor.id,
+      hospitalId: doctor.hospitalId,
+      updatedAt: new Date(),
+    })
+    .where(eq(usersTable.id, doctor.userId));
+
   const hospital = await db.select().from(hospitalsTable).where(eq(hospitalsTable.id, doctor.hospitalId)).limit(1);
   const department = await db.select().from(departmentsTable).where(eq(departmentsTable.id, doctor.departmentId)).limit(1);
   res.status(201).json({
     ...doctor,
-    firstName: user[0]?.firstName ?? null,
-    lastName: user[0]?.lastName ?? null,
-    profileImageUrl: user[0]?.profileImageUrl ?? null,
-    email: user[0]?.email ?? null,
+    firstName: targetUser[0]?.firstName ?? null,
+    lastName: targetUser[0]?.lastName ?? null,
+    profileImageUrl: targetUser[0]?.profileImageUrl ?? null,
+    email: targetUser[0]?.email ?? null,
     hospitalName: hospital[0]?.name ?? null,
     departmentName: department[0]?.name ?? null,
     nextAvailableSlot: null,
