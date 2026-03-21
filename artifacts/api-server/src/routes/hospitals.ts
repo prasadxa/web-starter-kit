@@ -10,16 +10,19 @@ import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+function serializeHospital(h: typeof hospitalsTable.$inferSelect) {
+  return {
+    ...h,
+    createdAt: h.createdAt instanceof Date ? h.createdAt.toISOString() : h.createdAt,
+  };
+}
+
 router.get("/hospitals", async (req: Request, res: Response) => {
-  let query = db.select().from(hospitalsTable);
   const approved = req.query.approved;
-  if (approved !== undefined) {
-    const rows = await db.select().from(hospitalsTable).where(eq(hospitalsTable.approved, approved === "true"));
-    res.json(GetHospitalsResponse.parse(rows));
-    return;
-  }
-  const rows = await query;
-  res.json(GetHospitalsResponse.parse(rows));
+  const rows = approved !== undefined
+    ? await db.select().from(hospitalsTable).where(eq(hospitalsTable.approved, approved === "true"))
+    : await db.select().from(hospitalsTable);
+  res.json(GetHospitalsResponse.parse(rows.map(serializeHospital)));
 });
 
 router.post("/hospitals", async (req: Request, res: Response) => {
@@ -27,8 +30,9 @@ router.post("/hospitals", async (req: Request, res: Response) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (req.user.role !== "super_admin") {
-    res.status(403).json({ error: "Only super_admin can create hospitals" });
+  const role = req.user.role;
+  if (role !== "super_admin" && role !== "hospital_admin") {
+    res.status(403).json({ error: "Only admin users can create hospitals" });
     return;
   }
   const parsed = CreateHospitalBody.safeParse(req.body);
@@ -36,7 +40,11 @@ router.post("/hospitals", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Validation error" });
     return;
   }
-  const [hospital] = await db.insert(hospitalsTable).values(parsed.data).returning();
+  const insertData = { ...parsed.data };
+  if (role !== "super_admin") {
+    delete (insertData as Record<string, unknown>).approved;
+  }
+  const [hospital] = await db.insert(hospitalsTable).values(insertData).returning();
   res.status(201).json(hospital);
 });
 
@@ -47,7 +55,7 @@ router.get("/hospitals/:id", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Hospital not found" });
     return;
   }
-  res.json(GetHospitalResponse.parse(hospital));
+  res.json(GetHospitalResponse.parse(serializeHospital(hospital)));
 });
 
 router.patch("/hospitals/:id", async (req: Request, res: Response) => {

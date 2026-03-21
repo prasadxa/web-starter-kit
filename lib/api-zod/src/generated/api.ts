@@ -541,7 +541,7 @@ export const CreateReviewBody = zod.object({
  * @summary Get the current user's app profile (role, etc.)
  */
 export const GetUserProfileResponse = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   replitUserId: zod.string(),
   email: zod.string().nullish(),
   firstName: zod.string().nullish(),
@@ -563,7 +563,7 @@ export const UpdateUserProfileBody = zod.object({
 });
 
 export const UpdateUserProfileResponse = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   replitUserId: zod.string(),
   email: zod.string().nullish(),
   firstName: zod.string().nullish(),
@@ -640,7 +640,7 @@ export const GetAdminAnalyticsResponse = zod.object({
  * @summary List all users (super admin only)
  */
 export const GetAdminUsersResponseItem = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   replitUserId: zod.string(),
   email: zod.string().nullish(),
   firstName: zod.string().nullish(),
@@ -662,7 +662,7 @@ export const UpdateAdminUserBody = zod.object({
 });
 
 export const UpdateAdminUserResponse = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   replitUserId: zod.string(),
   email: zod.string().nullish(),
   firstName: zod.string().nullish(),

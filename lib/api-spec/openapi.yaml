@@ -1252,7 +1252,7 @@ components:
       required: [id, replitUserId, role]
       properties:
         id:
-          type: integer
+          type: string
         replitUserId:
           type: string
         email:

@@ -24,7 +24,7 @@ router.get("/users/profile", async (req: Request, res: Response) => {
   }
 
   res.json(GetUserProfileResponse.parse({
-    id: 0,
+    id: user.id,
     replitUserId: user.id,
     email: user.email,
     firstName: user.firstName,
@@ -85,7 +85,7 @@ router.patch("/users/profile", async (req: Request, res: Response) => {
   }
 
   res.json(UpdateUserProfileResponse.parse({
-    id: 0,
+    id: updated.id,
     replitUserId: updated.id,
     email: updated.email,
     firstName: updated.firstName,

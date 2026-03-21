@@ -215,6 +215,7 @@ router.get("/doctors/:id", async (req: Request, res: Response) => {
 
   const recentReviews = reviews.map(r => ({
     ...r.review,
+    createdAt: r.review.createdAt instanceof Date ? r.review.createdAt.toISOString() : r.review.createdAt,
     patientFirstName: r.patient?.firstName ?? null,
     patientLastName: r.patient?.lastName ?? null,
     patientProfileImageUrl: r.patient?.profileImageUrl ?? null,
@@ -242,11 +243,14 @@ router.patch("/doctors/:id", async (req: Request, res: Response) => {
   const id = parseInt(String(req.params.id));
   const role = req.user.role;
   const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
-  const canEdit =
-    role === "super_admin" ||
-    (role === "hospital_admin") ||
-    isOwnDoctor;
-  if (!canEdit) {
+
+  if (role === "hospital_admin") {
+    const [doctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
+    if (!doctor || doctor.hospitalId !== req.user.hospitalId) {
+      res.status(403).json({ error: "Forbidden: doctor does not belong to your hospital" });
+      return;
+    }
+  } else if (!isOwnDoctor && role !== "super_admin") {
     res.status(403).json({ error: "Forbidden: insufficient permissions" });
     return;
   }
@@ -288,6 +292,7 @@ router.get("/doctors/:id/reviews", async (req: Request, res: Response) => {
 
   const mapped = reviews.map(r => ({
     ...r.review,
+    createdAt: r.review.createdAt instanceof Date ? r.review.createdAt.toISOString() : r.review.createdAt,
     patientFirstName: r.patient?.firstName ?? null,
     patientLastName: r.patient?.lastName ?? null,
     patientProfileImageUrl: r.patient?.profileImageUrl ?? null,
@@ -324,11 +329,14 @@ router.post("/doctors/:id/availability", async (req: Request, res: Response) => 
   const id = parseInt(String(req.params.id));
   const role = req.user.role;
   const isOwnDoctor = role === "doctor" && req.user.doctorId === id;
-  const canManage =
-    role === "super_admin" ||
-    role === "hospital_admin" ||
-    isOwnDoctor;
-  if (!canManage) {
+
+  if (role === "hospital_admin") {
+    const [doctor] = await db.select().from(doctorsTable).where(eq(doctorsTable.id, id)).limit(1);
+    if (!doctor || doctor.hospitalId !== req.user.hospitalId) {
+      res.status(403).json({ error: "Forbidden: doctor does not belong to your hospital" });
+      return;
+    }
+  } else if (!isOwnDoctor && role !== "super_admin") {
     res.status(403).json({ error: "Forbidden: cannot manage this doctor's availability" });
     return;
   }

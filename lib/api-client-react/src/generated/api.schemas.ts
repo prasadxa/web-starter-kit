@@ -349,7 +349,7 @@ export const UserProfileRole = {
 } as const;
 
 export interface UserProfile {
-  id: number;
+  id: string;
   replitUserId: string;
   /** @nullable */
   email?: string | null;

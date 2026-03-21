@@ -112,7 +112,7 @@ router.get("/admin/users", async (req: Request, res: Response) => {
 
   const users = await db.select().from(usersTable);
   const mapped = users.map(u => ({
-    id: 0,
+    id: u.id,
     replitUserId: u.id,
     email: u.email,
     firstName: u.firstName,
@@ -150,7 +150,7 @@ router.patch("/admin/users", async (req: Request, res: Response) => {
   }
 
   res.json(UpdateAdminUserResponse.parse({
-    id: 0,
+    id: updated.id,
     replitUserId: updated.id,
     email: updated.email,
     firstName: updated.firstName,

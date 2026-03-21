@@ -1,5 +1,5 @@
-import { db, hospitalsTable, departmentsTable, doctorsTable, availabilityTable, appointmentsTable, reviewsTable } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, hospitalsTable, departmentsTable, doctorsTable, availabilityTable, appointmentsTable, reviewsTable, usersTable } from "@workspace/db";
+import { sql, eq } from "drizzle-orm";
 
 async function seed() {
   console.log("Seeding database...");
@@ -125,6 +125,81 @@ async function seed() {
         .values({ doctorId: doctor.id, date: dateStr, timeSlots: slots })
         .onConflictDoNothing();
     }
+  }
+
+  // Seed sample patients
+  const patientData = [
+    { id: "seed-patient-1", firstName: "Alice", lastName: "Thompson", email: "alice.thompson@example.com" },
+    { id: "seed-patient-2", firstName: "Bob", lastName: "Williams", email: "bob.williams@example.com" },
+    { id: "seed-patient-3", firstName: "Carol", lastName: "Davis", email: "carol.davis@example.com" },
+  ];
+
+  for (const p of patientData) {
+    await db.insert(usersTable).values({ id: p.id, firstName: p.firstName, lastName: p.lastName, email: p.email, role: "patient" }).onConflictDoNothing();
+  }
+
+  // Fetch seeded doctors
+  const seededDoctors = await db.select().from(doctorsTable).where(sql`${doctorsTable.userId} LIKE 'seed-doctor-%'`).orderBy(doctorsTable.id);
+  if (seededDoctors.length === 0) {
+    console.log("No seeded doctors found; skipping appointments/reviews.");
+    console.log("Database seeded successfully!");
+    return;
+  }
+
+  const past = (daysAgo: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    return d.toISOString().split("T")[0];
+  };
+
+  const sampleAppointments = [
+    { patientId: "seed-patient-1", doctor: seededDoctors[0], date: past(10), timeSlot: "09:00 AM", status: "completed" as const, notes: "Follow-up on ECG results" },
+    { patientId: "seed-patient-1", doctor: seededDoctors[1], date: past(5), timeSlot: "10:00 AM", status: "completed" as const, notes: "Skin rash evaluation" },
+    { patientId: "seed-patient-2", doctor: seededDoctors[2], date: past(7), timeSlot: "09:30 AM", status: "completed" as const, notes: "Annual skin check" },
+    { patientId: "seed-patient-2", doctor: seededDoctors[4], date: past(3), timeSlot: "11:00 AM", status: "booked" as const, notes: "Headache and dizziness" },
+    { patientId: "seed-patient-3", doctor: seededDoctors[5], date: past(14), timeSlot: "02:00 PM", status: "completed" as const, notes: "Lower back pain" },
+    { patientId: "seed-patient-3", doctor: seededDoctors[6], date: past(2), timeSlot: "09:00 AM", status: "pending" as const, notes: "Child checkup" },
+  ];
+
+  const insertedAppts: { id: number; patientId: string; doctorId: number; status: string }[] = [];
+  for (const a of sampleAppointments) {
+    const [appt] = await db
+      .insert(appointmentsTable)
+      .values({
+        patientId: a.patientId,
+        doctorId: a.doctor.id,
+        hospitalId: a.doctor.hospitalId,
+        date: a.date,
+        timeSlot: a.timeSlot,
+        status: a.status,
+        notes: a.notes,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (appt) insertedAppts.push(appt);
+  }
+
+  // Seed reviews for completed appointments
+  const completedAppts = insertedAppts.filter(a => a.status === "completed");
+  const reviewTexts = [
+    "Excellent doctor, very thorough and caring. Highly recommend!",
+    "Great experience, explained everything clearly and patiently.",
+    "Very professional, diagnosis was spot on. Will visit again.",
+  ];
+  for (let i = 0; i < completedAppts.length && i < reviewTexts.length; i++) {
+    const appt = completedAppts[i];
+    const existingAppt = sampleAppointments.find(a => a.patientId === appt.patientId && a.status === "completed" && insertedAppts.some(ia => ia.id === appt.id));
+    if (!existingAppt) continue;
+    await db
+      .insert(reviewsTable)
+      .values({
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        doctorId: existingAppt.doctor.id,
+        rating: 4 + (i % 2),
+        comment: reviewTexts[i],
+      })
+      .onConflictDoNothing();
   }
 
   console.log("Database seeded successfully!");

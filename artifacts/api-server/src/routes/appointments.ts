@@ -49,9 +49,20 @@ router.get("/appointments", async (req: Request, res: Response) => {
     conditions.push(eq(appointmentsTable.patientId, userId));
   } else if (role === "doctor") {
     const doctor = await db.select().from(doctorsTable).where(eq(doctorsTable.userId, userId)).limit(1);
-    if (doctor[0]) conditions.push(eq(appointmentsTable.doctorId, doctor[0].id));
-  } else if (role === "hospital_admin" && user[0].hospitalId) {
+    if (!doctor[0]) {
+      res.json({ appointments: [], total: 0, page: pageNum, limit: limitNum });
+      return;
+    }
+    conditions.push(eq(appointmentsTable.doctorId, doctor[0].id));
+  } else if (role === "hospital_admin") {
+    if (!user[0].hospitalId) {
+      res.json({ appointments: [], total: 0, page: pageNum, limit: limitNum });
+      return;
+    }
     conditions.push(eq(appointmentsTable.hospitalId, user[0].hospitalId));
+  } else if (role !== "super_admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
   }
 
   if (status) conditions.push(eq(appointmentsTable.status, status as "booked" | "cancelled" | "completed" | "pending"));
@@ -130,7 +141,7 @@ router.post("/appointments", async (req: Request, res: Response) => {
         eq(appointmentsTable.doctorId, doctorId),
         eq(appointmentsTable.date, date),
         eq(appointmentsTable.timeSlot, timeSlot),
-        eq(appointmentsTable.status, "booked"),
+        sql`${appointmentsTable.status} IN ('booked', 'pending')`,
       )
     )
     .limit(1);
@@ -151,7 +162,7 @@ router.post("/appointments", async (req: Request, res: Response) => {
         date,
         timeSlot,
         notes: notes ?? null,
-        status: "booked",
+        status: "pending",
       })
       .returning();
   } catch (err: unknown) {
@@ -260,16 +271,17 @@ router.patch("/appointments/:id", async (req: Request, res: Response) => {
     }
   }
 
-  if (parsed.data.date && parsed.data.timeSlot && parsed.data.date !== existing.date || parsed.data.timeSlot !== existing.timeSlot) {
+  const changingSlot = (parsed.data.date && parsed.data.date !== existing.date) || (parsed.data.timeSlot && parsed.data.timeSlot !== existing.timeSlot);
+  if (changingSlot) {
     const conflict = await db
       .select()
       .from(appointmentsTable)
       .where(
         and(
           eq(appointmentsTable.doctorId, existing.doctorId),
-          eq(appointmentsTable.date, parsed.data.date || existing.date),
-          eq(appointmentsTable.timeSlot, parsed.data.timeSlot || existing.timeSlot),
-          eq(appointmentsTable.status, "booked"),
+          eq(appointmentsTable.date, parsed.data.date ?? existing.date),
+          eq(appointmentsTable.timeSlot, parsed.data.timeSlot ?? existing.timeSlot),
+          sql`${appointmentsTable.status} IN ('booked', 'pending')`,
         )
       )
       .limit(1);
