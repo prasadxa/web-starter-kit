@@ -152,6 +152,12 @@ router.post("/doctors", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Validation error" });
     return;
   }
+  if (role === "hospital_admin") {
+    if (!req.user.hospitalId || parsed.data.hospitalId !== req.user.hospitalId) {
+      res.status(403).json({ error: "Hospital admins can only create doctors for their own hospital" });
+      return;
+    }
+  }
   const [doctor] = await db.insert(doctorsTable).values(parsed.data).returning();
   const user = await db.select().from(usersTable).where(eq(usersTable.id, doctor.userId)).limit(1);
   const hospital = await db.select().from(hospitalsTable).where(eq(hospitalsTable.id, doctor.hospitalId)).limit(1);
