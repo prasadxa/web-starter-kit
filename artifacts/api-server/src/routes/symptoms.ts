@@ -5,7 +5,7 @@ const router: IRouter = Router();
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
 });
 
 router.post("/symptoms/check", async (req: Request, res: Response) => {
@@ -61,7 +61,11 @@ Respond in this exact JSON format:
       recommendedDepartment: parsed.recommendedDepartment || "General Medicine",
       advice: parsed.advice || "Please consult a doctor for proper diagnosis.",
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === 'insufficient_quota') {
+      res.status(429).json({ error: "AI service temporarily unavailable (quota exceeded). Please try again later or contact support." });
+      return;
+    }
     console.error("Symptom check error:", err);
     res.status(500).json({ error: "Failed to analyze symptoms" });
   }
