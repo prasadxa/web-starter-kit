@@ -26,6 +26,8 @@ export const usersTable = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default("patient"),
+  resetToken: varchar("reset_token"),
+  resetTokenExpires: timestamp("reset_token_expires", { withTimezone: true }),
   hospitalId: integer("hospital_id"),
   doctorId: integer("doctor_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -9,6 +9,7 @@ import {
 import { db, usersTable } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import {
   clearSession,
   getOidcConfig,
@@ -285,6 +286,134 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   } catch (err: any) {
     req.log.error({ err }, "Login error");
     res.status(500).json({ error: "Login failed. Please try again." });
+  }
+});
+
+const RESET_TOKEN_TTL = 30 * 60 * 1000;
+
+router.post("/auth/forgot-password", async (req: Request, res: Response) => {
+  try {
+    const { emailOrPhone: rawEmailOrPhone } = req.body;
+
+    if (!rawEmailOrPhone) {
+      res.status(400).json({ error: "Email or phone number is required" });
+      return;
+    }
+
+    const isEmail = rawEmailOrPhone.includes("@");
+    const emailOrPhone = isEmail
+      ? normalizeEmail(rawEmailOrPhone)
+      : normalizePhone(rawEmailOrPhone);
+
+    const rateCheck = checkRateLimit(`reset:${emailOrPhone}`);
+    if (!rateCheck.allowed) {
+      res.status(429).json({
+        error: `Too many reset attempts. Please try again in ${Math.ceil(rateCheck.retryAfter! / 60)} minutes.`,
+      });
+      return;
+    }
+
+    const condition = isEmail
+      ? eq(usersTable.email, emailOrPhone)
+      : eq(usersTable.phone, emailOrPhone);
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(condition);
+
+    if (!user) {
+      res.json({ message: "If an account exists with this information, you will receive a reset code.", resetToken: null });
+      return;
+    }
+
+    const resetToken = crypto.randomBytes(3).toString("hex").toUpperCase();
+    const resetTokenExpires = new Date(Date.now() + RESET_TOKEN_TTL);
+
+    await db
+      .update(usersTable)
+      .set({
+        resetToken,
+        resetTokenExpires,
+      } as any)
+      .where(eq(usersTable.id, user.id));
+
+    req.log.info({ userId: user.id, resetToken }, "Password reset token generated");
+
+    res.json({
+      message: "If an account exists with this information, you will receive a reset code.",
+      resetToken,
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Forgot password error");
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+router.post("/auth/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { emailOrPhone: rawEmailOrPhone, resetToken, newPassword } = req.body;
+
+    if (!rawEmailOrPhone || !resetToken || !newPassword) {
+      res.status(400).json({ error: "All fields are required" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
+    }
+
+    const isEmail = rawEmailOrPhone.includes("@");
+    const emailOrPhone = isEmail
+      ? normalizeEmail(rawEmailOrPhone)
+      : normalizePhone(rawEmailOrPhone);
+
+    const condition = isEmail
+      ? eq(usersTable.email, emailOrPhone)
+      : eq(usersTable.phone, emailOrPhone);
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(condition);
+
+    if (!user) {
+      res.status(400).json({ error: "Invalid reset code" });
+      return;
+    }
+
+    const storedToken = (user as any).resetToken;
+    const tokenExpires = (user as any).resetTokenExpires;
+
+    if (!storedToken || storedToken !== resetToken.toUpperCase()) {
+      recordFailedAttempt(`reset:${emailOrPhone}`);
+      res.status(400).json({ error: "Invalid reset code" });
+      return;
+    }
+
+    if (!tokenExpires || new Date(tokenExpires) < new Date()) {
+      res.status(400).json({ error: "Reset code has expired. Please request a new one." });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await db
+      .update(usersTable)
+      .set({
+        passwordHash,
+        resetToken: null,
+        resetTokenExpires: null,
+      } as any)
+      .where(eq(usersTable.id, user.id));
+
+    clearFailedAttempts(`reset:${emailOrPhone}`);
+
+    res.json({ message: "Password has been reset successfully. You can now sign in." });
+  } catch (err: any) {
+    req.log.error({ err }, "Reset password error");
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
