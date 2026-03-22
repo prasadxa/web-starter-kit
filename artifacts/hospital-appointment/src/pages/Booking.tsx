@@ -10,11 +10,36 @@ import {
   useGetDoctor, 
   useGetDoctorAvailability, 
   useCreateAppointment,
-  useCreatePaymentSession,
   getGetAppointmentsQueryKey 
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
+
+declare global {
+  interface Window {
+    Cashfree?: any;
+  }
+}
+
+function loadCashfreeSDK(environment: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (window.Cashfree) {
+      resolve(window.Cashfree);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.onload = () => {
+      if (window.Cashfree) {
+        resolve(window.Cashfree);
+      } else {
+        reject(new Error("Cashfree SDK failed to load"));
+      }
+    };
+    script.onerror = () => reject(new Error("Failed to load Cashfree SDK"));
+    document.head.appendChild(script);
+  });
+}
 
 export default function Booking() {
   const { id } = useParams();
@@ -31,13 +56,12 @@ export default function Booking() {
   const { data: availability, isLoading: availLoading } = useGetDoctorAvailability(doctorId, { startDate, endDate });
   
   const createBooking = useCreateAppointment();
-  const createPayment = useCreatePaymentSession();
   
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [consultationType, setConsultationType] = useState<"offline" | "online">("offline");
   const [notes, setNotes] = useState("");
-  const [payingAppointmentId, setPayingAppointmentId] = useState<number | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   const upcomingDays = Array.from({ length: 14 }).map((_, i) => {
     const d = addDays(new Date(), i);
@@ -52,6 +76,93 @@ export default function Booking() {
   });
 
   const selectedDayInfo = upcomingDays.find(d => d.dateStr === selectedDate);
+
+  const handleCashfreePayment = async (appointmentId: number) => {
+    setIsProcessingPayment(true);
+    try {
+      const response = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ appointmentId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create payment order");
+      }
+
+      if (data.demo) {
+        toast({
+          title: "Appointment Booked!",
+          description: data.message || `Your appointment has been confirmed (demo mode).`,
+        });
+        queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+        setLocation("/dashboard");
+        return;
+      }
+
+      const cashfreeEnv = data.environment === "production" ? "production" : "sandbox";
+
+      await loadCashfreeSDK(cashfreeEnv);
+
+      const cashfree = window.Cashfree({
+        mode: cashfreeEnv,
+      });
+
+      const checkoutOptions = {
+        paymentSessionId: data.paymentSessionId,
+        redirectTarget: "_modal",
+      };
+
+      const result = await cashfree.checkout(checkoutOptions);
+
+      if (result.error) {
+        console.error("Cashfree checkout error:", result.error);
+        toast({
+          variant: "destructive",
+          title: "Payment Failed",
+          description: result.error.message || "Payment was not completed. Please try again.",
+        });
+        return;
+      }
+
+      if (result.paymentDetails) {
+        const verifyRes = await fetch("/api/payments/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ orderId: data.orderId }),
+        });
+        const verifyData = await verifyRes.json();
+
+        if (verifyData.status === "PAID") {
+          toast({
+            title: "Payment Successful!",
+            description: `Your appointment has been confirmed and payment received.`,
+          });
+        } else {
+          toast({
+            title: "Appointment Booked",
+            description: "Payment is being processed. We'll confirm once completed.",
+          });
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+      setLocation("/dashboard");
+    } catch (err: any) {
+      console.error("Payment error:", err);
+      toast({
+        variant: "destructive",
+        title: "Payment Error",
+        description: err.message || "Something went wrong with the payment. Please try again.",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   const handleBooking = () => {
     if (!isAuthenticated) {
@@ -75,29 +186,7 @@ export default function Booking() {
       onSuccess: (appointment) => {
         const apptId = (appointment as { id?: number })?.id;
         if (apptId) {
-          setPayingAppointmentId(apptId);
-          createPayment.mutate({ data: { appointmentId: apptId } }, {
-            onSuccess: (paymentRes) => {
-              const url = (paymentRes as { url?: string })?.url;
-              if (url && url.startsWith("http")) {
-                window.open(url, "_blank");
-              }
-              toast({
-                title: "Appointment Booked!",
-                description: `Your ${consultationType === "online" ? "video" : "in-person"} appointment with Dr. ${doctor.firstName} is scheduled for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
-              });
-              queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
-              setLocation("/dashboard");
-            },
-            onError: () => {
-              toast({
-                title: "Appointment Booked!",
-                description: `Payment will be collected later. Your appointment with Dr. ${doctor.firstName} is confirmed for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
-              });
-              queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
-              setLocation("/dashboard");
-            }
-          });
+          handleCashfreePayment(apptId);
         } else {
           toast({
             title: "Appointment Confirmed!",
@@ -280,17 +369,17 @@ export default function Booking() {
                 </div>
                 <div className="pt-4 border-t border-border/50 flex justify-between items-center">
                   <span className="text-muted-foreground">Consultation Fee</span>
-                  <span className="text-2xl font-display font-bold text-primary">${doctor.consultationFee}</span>
+                  <span className="text-2xl font-display font-bold text-primary">&#8377;{doctor.consultationFee}</span>
                 </div>
               </div>
 
               <Button 
                 onClick={handleBooking}
-                disabled={!selectedDate || !selectedSlot || createBooking.isPending || createPayment.isPending}
+                disabled={!selectedDate || !selectedSlot || createBooking.isPending || isProcessingPayment}
                 size="lg" 
                 className="w-full rounded-xl shadow-lg font-bold"
               >
-                {(createBooking.isPending || createPayment.isPending) ? (
+                {(createBooking.isPending || isProcessingPayment) ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
                 ) : (
                   <><CreditCard className="w-4 h-4 mr-2" /> Book & Pay</>
@@ -298,7 +387,7 @@ export default function Booking() {
               </Button>
               
               <p className="text-xs text-center text-muted-foreground mt-4">
-                Secure payment processing. You'll be redirected to complete payment.
+                Secure payment via Cashfree. Pay using UPI, Cards, Net Banking & more.
               </p>
             </div>
           </div>

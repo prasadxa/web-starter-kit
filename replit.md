@@ -47,7 +47,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 - **Appointment Lifecycle**: pending → booked → completed/cancelled
 - **Reviews**: Auto-updates doctor's averageRating + totalReviews after submission, doctor reply support, verified patient badge
 - **AI Symptom Checker**: OpenAI GPT-4o-mini integration for symptom analysis and department recommendation
-- **Payment Processing**: Stripe integration with demo fallback (auto-marks paid if no STRIPE_SECRET_KEY)
+- **Payment Processing**: Cashfree integration (UPI, Cards, Net Banking) with demo fallback if keys not configured
 - **Hospital Map**: Leaflet/OpenStreetMap with hospital markers and Google Maps directions
 - **Medical Records (EHR)**: CRUD for medical records — patients can self-create, doctors/admins manage
 - **In-app Notifications**: Real-time notification bell with unread count, mark-read support
@@ -84,7 +84,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 - `POST /symptoms/check` (AI symptom analysis)
 - `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`
 - `GET/POST /medical-records`
-- `POST /payments/create-session`, `GET /payments/success`, `POST /payments/webhook`
+- `POST /payments/create-order`, `GET /payments/callback`, `POST /payments/verify`, `POST /payments/webhook`
 - `GET /auth/user`, `GET /auth/login`, `GET /auth/callback`, `GET /auth/logout`
 
 ## Auth Flow
@@ -106,7 +106,9 @@ Replit OIDC → `/api/login` → Replit OAuth → `/api/callback` → session co
 
 - `DATABASE_URL` — PostgreSQL connection string (auto-set by Replit)
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` / `AI_INTEGRATIONS_OPENAI_API_KEY` — Replit AI Integration (auto-set)
-- `STRIPE_SECRET_KEY` — Optional; if not set, payment runs in demo mode (auto-marks paid)
+- `CASHFREE_APP_ID` — Cashfree App ID (from Cashfree Dashboard > Developers > API Keys)
+- `CASHFREE_SECRET_KEY` — Cashfree Secret Key
+- `CASHFREE_ENV` — "production" for live payments, "sandbox" for testing (default: sandbox)
 
 ## Development Commands
 
@@ -125,7 +127,8 @@ pnpm --filter @workspace/hospital-appointment run dev  # Start frontend
 - **Doctor Names**: Stored directly on `doctors` table (`firstName`, `lastName`) for seed doctors
 - **Vite Proxy**: Frontend Vite config proxies `/api/*` to `http://localhost:8080` for development
 - **Seed Data**: 3 hospitals (with lat/lng), 10 departments, 12 doctors with 5-7 days of availability pre-seeded
-- **Stripe Demo Mode**: If `STRIPE_SECRET_KEY` is not set, payment endpoints mark appointments as paid immediately without Stripe
+- **Cashfree Payment**: Uses Cashfree PG SDK (v3 JS checkout modal). If `CASHFREE_APP_ID`/`CASHFREE_SECRET_KEY` not set, demo mode auto-marks appointments as paid
+- **Cashfree Flow**: Backend creates order → Frontend opens Cashfree checkout modal → On success, verifies payment → Updates appointment status
 
 ## TypeScript & Composite Projects
 
