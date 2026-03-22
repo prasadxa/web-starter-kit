@@ -1,7 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, appointmentsTable, doctorsTable, usersTable, hospitalsTable, departmentsTable, availabilityTable } from "@workspace/db";
 import {
-  CreateAppointmentBody,
   UpdateAppointmentBody,
 } from "@workspace/api-zod";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -127,14 +126,12 @@ router.post("/appointments", async (req: Request, res: Response) => {
     res.status(403).json({ error: "Only patients can book appointments" });
     return;
   }
-  const parsed = CreateAppointmentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Validation error" });
+  const { doctorId, hospitalId, date, timeSlot, notes, consultationType: ctRaw } = req.body;
+  if (!doctorId || !hospitalId || !date || !timeSlot) {
+    res.status(400).json({ error: "Missing required fields: doctorId, hospitalId, date, timeSlot" });
     return;
   }
-
-  const { doctorId, hospitalId, date, timeSlot, notes } = parsed.data;
-  const consultationType = req.body.consultationType === "online" ? "online" : "offline";
+  const consultationType = ctRaw === "online" ? "online" : "offline";
 
   const [doctor] = await db
     .select()
