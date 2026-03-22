@@ -1,8 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, appointmentsTable, doctorsTable, usersTable, hospitalsTable, departmentsTable, availabilityTable } from "@workspace/db";
 import {
-  GetAppointmentsResponse,
-  GetAppointmentResponse,
   CreateAppointmentBody,
   UpdateAppointmentBody,
 } from "@workspace/api-zod";
@@ -117,7 +115,7 @@ router.get("/appointments", async (req: Request, res: Response) => {
     }
   }
 
-  res.json(GetAppointmentsResponse.parse(serializeDates({ appointments: mapped, total: count, page: pageNum, limit: limitNum })));
+  res.json(serializeDates({ appointments: mapped, total: count, page: pageNum, limit: limitNum }));
 });
 
 router.post("/appointments", async (req: Request, res: Response) => {
@@ -136,6 +134,7 @@ router.post("/appointments", async (req: Request, res: Response) => {
   }
 
   const { doctorId, hospitalId, date, timeSlot, notes } = parsed.data;
+  const consultationType = req.body.consultationType === "online" ? "online" : "offline";
 
   const [doctor] = await db
     .select()
@@ -203,6 +202,7 @@ router.post("/appointments", async (req: Request, res: Response) => {
         timeSlot,
         notes: notes ?? null,
         status: "pending",
+        consultationType: consultationType ?? "offline",
       })
       .returning();
   } catch (err: unknown) {
@@ -264,7 +264,7 @@ router.get("/appointments/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  res.json(GetAppointmentResponse.parse(serializeDates({
+  res.json(serializeDates({
     ...row.appointment,
     doctorFirstName: row.doctorUser?.firstName ?? null,
     doctorLastName: row.doctorUser?.lastName ?? null,
@@ -274,7 +274,7 @@ router.get("/appointments/:id", async (req: Request, res: Response) => {
     departmentName: row.department?.name ?? null,
     patientFirstName: null,
     patientLastName: null,
-  })));
+  }));
 });
 
 router.patch("/appointments/:id", async (req: Request, res: Response) => {

@@ -1,4 +1,4 @@
-import { Star, MapPin, Award, Clock, ChevronRight, MessageSquare, IndianRupee } from "lucide-react";
+import { Star, MapPin, Award, Clock, ChevronRight, MessageSquare, IndianRupee, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import type { Doctor } from "@workspace/api-client-react";
@@ -6,6 +6,7 @@ import { format } from "date-fns";
 
 export function DoctorCard({ doctor }: { doctor: Doctor }) {
   const isTopRated = doctor.averageRating >= 4.5 && doctor.totalReviews >= 10;
+  const isMostBooked = doctor.totalReviews >= 25;
 
   return (
     <div className="bg-card border border-border/60 rounded-3xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all duration-300 flex flex-col h-full group">
@@ -19,6 +20,11 @@ export function DoctorCard({ doctor }: { doctor: Doctor }) {
           {isTopRated && (
             <div className="absolute -bottom-3 -right-2 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full p-1.5 shadow-lg shadow-amber-500/30 text-white" title="Top Rated">
               <Award className="w-4 h-4" />
+            </div>
+          )}
+          {!isTopRated && isMostBooked && (
+            <div className="absolute -bottom-3 -right-2 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full p-1.5 shadow-lg shadow-blue-500/30 text-white" title="Most Booked">
+              <TrendingUp className="w-4 h-4" />
             </div>
           )}
         </div>

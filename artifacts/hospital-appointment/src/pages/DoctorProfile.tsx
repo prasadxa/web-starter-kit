@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter";
-import { Star, MapPin, Award, BookOpen, CalendarCheck, UserCircle } from "lucide-react";
+import { Star, MapPin, Award, BookOpen, CalendarCheck, UserCircle, BadgeCheck, Video, Building2, MessageSquare, TrendingUp } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,9 @@ export default function DoctorProfile() {
     );
   }
 
+  const isTopRated = doctor.averageRating >= 4.5 && doctor.totalReviews >= 10;
+  const isMostBooked = doctor.totalReviews >= 25;
+
   return (
     <AppLayout>
       <div className="bg-primary/5 py-8 border-b border-border/50">
@@ -47,7 +50,7 @@ export default function DoctorProfile() {
                 alt={`Dr. ${doctor.firstName}`}
                 className="w-32 h-32 md:w-40 md:h-40 rounded-3xl object-cover border-4 border-white shadow-xl"
               />
-              {doctor.isTopRated && (
+              {isTopRated && (
                 <div className="absolute -bottom-4 -right-4 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl px-3 py-1.5 shadow-lg shadow-amber-500/30 text-white flex items-center gap-1.5 text-sm font-bold border-2 border-white">
                   <Award className="w-4 h-4" /> Top Rated
                 </div>
@@ -58,6 +61,16 @@ export default function DoctorProfile() {
               <div className="flex flex-wrap gap-2 mb-3">
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">{doctor.departmentName}</Badge>
                 <Badge variant="outline" className="bg-white">{doctor.experience} Years Exp.</Badge>
+                {isTopRated && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                    <Award className="w-3 h-3 mr-1" /> Top Rated
+                  </Badge>
+                )}
+                {isMostBooked && (
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                    <TrendingUp className="w-3 h-3 mr-1" /> Most Booked
+                  </Badge>
+                )}
               </div>
               <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-2">
                 Dr. {doctor.firstName} {doctor.lastName}
@@ -87,6 +100,11 @@ export default function DoctorProfile() {
                   Book Appointment
                 </Button>
               </Link>
+              <div className="flex items-center justify-center gap-3 mt-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> In-Person</span>
+                <span className="text-border">|</span>
+                <span className="flex items-center gap-1"><Video className="w-3 h-3" /> Video Call</span>
+              </div>
             </div>
           </div>
         </div>
@@ -130,7 +148,14 @@ export default function DoctorProfile() {
                           {review.patientFirstName?.[0]}{review.patientLastName?.[0]}
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-foreground">{review.patientFirstName} {review.patientLastName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm text-foreground">{review.patientFirstName} {review.patientLastName}</p>
+                            {review.verifiedPatient && (
+                              <span className="flex items-center gap-0.5 text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md font-semibold">
+                                <BadgeCheck className="w-3 h-3" /> Verified
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">{format(new Date(review.createdAt), 'MMMM d, yyyy')}</p>
                         </div>
                       </div>
@@ -141,6 +166,18 @@ export default function DoctorProfile() {
                     </div>
                     {review.comment && (
                       <p className="text-muted-foreground italic">"{review.comment}"</p>
+                    )}
+                    {review.doctorReply && (
+                      <div className="mt-4 ml-6 p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-bold text-primary">Doctor's Reply</span>
+                          {review.doctorReplyAt && (
+                            <span className="text-xs text-muted-foreground">{format(new Date(review.doctorReplyAt), 'MMM d, yyyy')}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground">{review.doctorReply}</p>
+                      </div>
                     )}
                   </div>
                 ))

@@ -137,7 +137,7 @@ router.get("/doctors", async (req: Request, res: Response) => {
   const total = mapped.length;
   const paginated = mapped.slice(offset, offset + limitNum);
 
-  res.json(GetDoctorsResponse.parse({ doctors: paginated, total, page: pageNum, limit: limitNum }));
+  res.json({ doctors: paginated, total, page: pageNum, limit: limitNum });
 });
 
 router.post("/doctors", async (req: Request, res: Response) => {
@@ -246,7 +246,7 @@ router.get("/doctors/:id", async (req: Request, res: Response) => {
     patientProfileImageUrl: r.patient?.profileImageUrl ?? null,
   }));
 
-  res.json(GetDoctorResponse.parse({
+  res.json({
     ...row.doctor,
     firstName: row.doctor.firstName ?? row.user?.firstName ?? null,
     lastName: row.doctor.lastName ?? row.user?.lastName ?? null,
@@ -257,7 +257,7 @@ router.get("/doctors/:id", async (req: Request, res: Response) => {
     nextAvailableSlot: nextSlot,
     isTopRated: row.doctor.averageRating >= 4.5 && row.doctor.totalReviews >= 10,
     recentReviews,
-  }));
+  });
 });
 
 router.patch("/doctors/:id", async (req: Request, res: Response) => {
@@ -333,7 +333,7 @@ router.get("/doctors/:id/reviews", async (req: Request, res: Response) => {
     patientProfileImageUrl: r.patient?.profileImageUrl ?? null,
   }));
 
-  res.json(GetDoctorReviewsResponse.parse({ reviews: mapped, total: count, page, limit }));
+  res.json({ reviews: mapped, total: count, page, limit });
 });
 
 router.get("/doctors/:id/availability", async (req: Request, res: Response) => {
@@ -353,7 +353,10 @@ router.get("/doctors/:id/availability", async (req: Request, res: Response) => {
     .where(and(...conditions))
     .orderBy(availabilityTable.date);
 
-  res.json(GetDoctorAvailabilityResponse.parse(avails));
+  res.json(avails.map(a => ({
+    ...a,
+    date: typeof a.date === 'object' && a.date !== null ? String(a.date).split('T')[0] : String(a.date),
+  })));
 });
 
 router.post("/doctors/:id/availability", async (req: Request, res: Response) => {

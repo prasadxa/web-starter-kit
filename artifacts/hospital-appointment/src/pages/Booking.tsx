@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { format, addDays } from "date-fns";
-import { Calendar as CalendarIcon, Clock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, ArrowLeft, Video, Building2, CreditCard, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   useGetDoctor, 
   useGetDoctorAvailability, 
-  useCreateAppointment, 
+  useCreateAppointment,
+  useCreatePaymentSession,
   getGetAppointmentsQueryKey 
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,12 +31,14 @@ export default function Booking() {
   const { data: availability, isLoading: availLoading } = useGetDoctorAvailability(doctorId, { startDate, endDate });
   
   const createBooking = useCreateAppointment();
+  const createPayment = useCreatePaymentSession();
   
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [consultationType, setConsultationType] = useState<"offline" | "online">("offline");
   const [notes, setNotes] = useState("");
+  const [payingAppointmentId, setPayingAppointmentId] = useState<number | null>(null);
   
-  // Create an array of next 14 days
   const upcomingDays = Array.from({ length: 14 }).map((_, i) => {
     const d = addDays(new Date(), i);
     const dateStr = format(d, 'yyyy-MM-dd');
@@ -65,16 +68,44 @@ export default function Booking() {
         hospitalId: doctor.hospitalId,
         date: selectedDate,
         timeSlot: selectedSlot,
-        notes: notes.trim() ? notes : undefined
+        notes: notes.trim() ? notes : undefined,
+        consultationType
       }
     }, {
-      onSuccess: () => {
-        toast({
-          title: "Appointment Confirmed!",
-          description: `Your appointment with Dr. ${doctor.firstName} is scheduled for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
-        });
-        queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
-        setLocation("/dashboard");
+      onSuccess: (appointment) => {
+        const apptId = (appointment as { id?: number })?.id;
+        if (apptId) {
+          setPayingAppointmentId(apptId);
+          createPayment.mutate({ data: { appointmentId: apptId } }, {
+            onSuccess: (paymentRes) => {
+              const url = (paymentRes as { url?: string })?.url;
+              if (url && url.startsWith("http")) {
+                window.open(url, "_blank");
+              }
+              toast({
+                title: "Appointment Booked!",
+                description: `Your ${consultationType === "online" ? "video" : "in-person"} appointment with Dr. ${doctor.firstName} is scheduled for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
+              });
+              queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+              setLocation("/dashboard");
+            },
+            onError: () => {
+              toast({
+                title: "Appointment Booked!",
+                description: `Payment will be collected later. Your appointment with Dr. ${doctor.firstName} is confirmed for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
+              });
+              queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+              setLocation("/dashboard");
+            }
+          });
+        } else {
+          toast({
+            title: "Appointment Confirmed!",
+            description: `Your appointment with Dr. ${doctor.firstName} is scheduled for ${format(new Date(selectedDate), 'MMM d')} at ${selectedSlot}.`,
+          });
+          queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+          setLocation("/dashboard");
+        }
       },
       onError: (err: Error) => {
         toast({
@@ -103,10 +134,43 @@ export default function Booking() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            {/* Step 1: Date */}
             <div className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm">
               <h2 className="text-xl font-bold flex items-center gap-2 mb-6">
-                <CalendarIcon className="w-5 h-5 text-primary" /> 1. Select Date
+                <Video className="w-5 h-5 text-primary" /> 1. Consultation Type
+              </h2>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setConsultationType("offline")}
+                  className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-3
+                    ${consultationType === "offline"
+                      ? "border-primary bg-primary/10 text-primary shadow-md"
+                      : "border-border/50 bg-background hover:border-primary/40 text-foreground"}`}
+                >
+                  <Building2 className="w-8 h-8" />
+                  <div className="text-center">
+                    <p className="font-bold">In-Person Visit</p>
+                    <p className="text-xs text-muted-foreground mt-1">Visit the hospital</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setConsultationType("online")}
+                  className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-3
+                    ${consultationType === "online"
+                      ? "border-primary bg-primary/10 text-primary shadow-md"
+                      : "border-border/50 bg-background hover:border-primary/40 text-foreground"}`}
+                >
+                  <Video className="w-8 h-8" />
+                  <div className="text-center">
+                    <p className="font-bold">Video Consultation</p>
+                    <p className="text-xs text-muted-foreground mt-1">Online video call</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm">
+              <h2 className="text-xl font-bold flex items-center gap-2 mb-6">
+                <CalendarIcon className="w-5 h-5 text-primary" /> 2. Select Date
               </h2>
               
               {availLoading ? (
@@ -139,10 +203,9 @@ export default function Booking() {
               )}
             </div>
 
-            {/* Step 2: Time */}
             <div className={`bg-card border border-border/60 rounded-3xl p-6 shadow-sm transition-opacity duration-300 ${selectedDate ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
               <h2 className="text-xl font-bold flex items-center gap-2 mb-6">
-                <Clock className="w-5 h-5 text-primary" /> 2. Select Time
+                <Clock className="w-5 h-5 text-primary" /> 3. Select Time
               </h2>
               
               {!selectedDate ? (
@@ -169,9 +232,8 @@ export default function Booking() {
               )}
             </div>
 
-            {/* Step 3: Details */}
             <div className={`bg-card border border-border/60 rounded-3xl p-6 shadow-sm transition-opacity duration-300 ${selectedSlot ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-              <h2 className="text-xl font-bold mb-4">3. Additional Notes (Optional)</h2>
+              <h2 className="text-xl font-bold mb-4">4. Additional Notes (Optional)</h2>
               <Textarea 
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -181,7 +243,6 @@ export default function Booking() {
             </div>
           </div>
 
-          {/* Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24 bg-card border border-border/60 rounded-3xl p-6 shadow-lg shadow-black/5">
               <h3 className="font-bold text-lg mb-6 border-b border-border/50 pb-4">Booking Summary</h3>
@@ -199,6 +260,12 @@ export default function Booking() {
               </div>
               
               <div className="space-y-4 mb-8 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    {consultationType === "online" ? <><Video className="w-3.5 h-3.5 text-blue-500" /> Video Call</> : <><Building2 className="w-3.5 h-3.5 text-emerald-500" /> In-Person</>}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Date</span>
                   <span className="font-bold text-foreground">{selectedDate ? format(new Date(selectedDate), 'MMM d, yyyy') : '-'}</span>
@@ -219,15 +286,19 @@ export default function Booking() {
 
               <Button 
                 onClick={handleBooking}
-                disabled={!selectedDate || !selectedSlot || createBooking.isPending}
+                disabled={!selectedDate || !selectedSlot || createBooking.isPending || createPayment.isPending}
                 size="lg" 
                 className="w-full rounded-xl shadow-lg font-bold"
               >
-                {createBooking.isPending ? "Confirming..." : "Confirm Booking"}
+                {(createBooking.isPending || createPayment.isPending) ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                ) : (
+                  <><CreditCard className="w-4 h-4 mr-2" /> Book & Pay</>
+                )}
               </Button>
               
               <p className="text-xs text-center text-muted-foreground mt-4">
-                You won't be charged yet. Payment is collected at the hospital.
+                Secure payment processing. You'll be redirected to complete payment.
               </p>
             </div>
           </div>

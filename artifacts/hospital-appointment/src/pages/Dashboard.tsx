@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, CheckCircle, XCircle, Star, UserPlus, FileText, PieChart as PieChartIcon } from "lucide-react";
+import { Calendar, Clock, MapPin, CheckCircle, XCircle, Star, UserPlus, FileText, PieChart as PieChartIcon, Video, Building2, CreditCard, ExternalLink, MessageSquare } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,9 @@ import {
   useGetAppointments, 
   useUpdateAppointment, 
   useCreateReview,
+  useReplyToReview,
+  useGetDoctorReviews,
+  getGetDoctorReviewsQueryKey,
   useGetAdminAnalytics,
   useSetDoctorAvailability,
   useGetDoctorAvailability,
@@ -232,7 +235,24 @@ function PatientDashboard() {
                 <h3 className="font-bold text-lg">Dr. {appt.doctorFirstName} {appt.doctorLastName}</h3>
                 <p className="text-muted-foreground text-sm flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {appt.timeSlot}</p>
                 <p className="text-muted-foreground text-sm flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {appt.hospitalName}</p>
-                {appt.status === 'pending' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-medium">Awaiting Confirmation</span>}
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {appt.status === 'pending' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-medium">Awaiting Confirmation</span>}
+                  {appt.consultationType === 'online' ? (
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><Video className="w-3 h-3" /> Video Call</span>
+                  ) : (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><Building2 className="w-3 h-3" /> In-Person</span>
+                  )}
+                  {appt.paymentStatus === 'paid' ? (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><CreditCard className="w-3 h-3" /> Paid</span>
+                  ) : appt.paymentStatus === 'pending' ? (
+                    <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><CreditCard className="w-3 h-3" /> Payment Pending</span>
+                  ) : null}
+                </div>
+                {appt.consultationType === 'online' && appt.meetingLink && (
+                  <a href={appt.meetingLink} target="_blank" rel="noopener noreferrer" className="text-sm text-primary font-semibold flex items-center gap-1.5 mt-2 hover:underline">
+                    <Video className="w-4 h-4" /> Join Video Call <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
             </div>
             <div className="flex gap-3">
@@ -279,8 +299,60 @@ function PatientDashboard() {
 // ----------------------------------------------------------------------
 // DOCTOR DASHBOARD
 // ----------------------------------------------------------------------
+function ReplyToReviewDialog({ reviewId, patientName, onSuccess }: { reviewId: number; patientName: string; onSuccess: () => void }) {
+  const [reply, setReply] = useState("");
+  const [open, setOpen] = useState(false);
+  const replyToReview = useReplyToReview();
+  const { toast } = useToast();
+
+  const submitReply = () => {
+    if (!reply.trim()) return;
+    replyToReview.mutate({ id: reviewId, data: { reply: reply.trim() } }, {
+      onSuccess: () => {
+        toast({ title: "Reply posted!" });
+        setOpen(false);
+        setReply("");
+        onSuccess();
+      },
+      onError: () => {
+        toast({ title: "Failed to post reply", variant: "destructive" });
+      }
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="rounded-xl text-primary border-primary/30">
+          <MessageSquare className="w-3.5 h-3.5 mr-1.5" /> Reply
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Reply to {patientName}'s Review</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <Textarea
+            value={reply}
+            onChange={e => setReply(e.target.value)}
+            placeholder="Write your response to this review..."
+            className="rounded-xl min-h-[100px]"
+          />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
+          <Button onClick={submitReply} disabled={replyToReview.isPending || !reply.trim()} className="rounded-xl">
+            {replyToReview.isPending ? "Posting..." : "Post Reply"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DoctorDashboard({ doctorId }: { doctorId: number }) {
   const { data: apptsData } = useGetAppointments({ doctorId, limit: 50 });
+  const { data: reviewsData, refetch: refetchReviews } = useGetDoctorReviews(doctorId, { limit: 50 });
   const updateAppointment = useUpdateAppointment();
   const setAvailability = useSetDoctorAvailability();
   const queryClient = useQueryClient();
@@ -289,11 +361,13 @@ function DoctorDashboard({ doctorId }: { doctorId: number }) {
   const [availDate, setAvailDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [slotsStr, setSlotsStr] = useState("09:00, 10:00, 11:00");
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+
   const handleUpdateStatus = (id: number, status: 'booked' | 'cancelled' | 'completed') => {
     updateAppointment.mutate({ id, data: { status } }, {
       onSuccess: () => {
         toast({ title: `Appointment marked as ${status}` });
-        queryClient.invalidateQueries({ queryKey: getGetAppointmentsQueryKey() });
+        invalidate();
       }
     });
   };
@@ -309,6 +383,7 @@ function DoctorDashboard({ doctorId }: { doctorId: number }) {
     <Tabs defaultValue="appointments" className="w-full">
       <TabsList className="mb-8 bg-muted/50 p-1 border border-border/50 rounded-xl">
         <TabsTrigger value="appointments" className="rounded-lg">My Appointments</TabsTrigger>
+        <TabsTrigger value="reviews" className="rounded-lg">Patient Reviews {reviewsData?.total ? `(${reviewsData.total})` : ''}</TabsTrigger>
         <TabsTrigger value="schedule" className="rounded-lg">Manage Schedule</TabsTrigger>
       </TabsList>
       
@@ -324,13 +399,69 @@ function DoctorDashboard({ doctorId }: { doctorId: number }) {
                 <p className="text-muted-foreground text-sm flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5" /> {format(new Date(appt.date), 'MMM d, yyyy')} at {appt.timeSlot}
                 </p>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {appt.consultationType === 'online' ? (
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><Video className="w-3 h-3" /> Video Call</span>
+                  ) : (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><Building2 className="w-3 h-3" /> In-Person</span>
+                  )}
+                  {appt.paymentStatus === 'paid' && (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-medium flex items-center gap-1"><CreditCard className="w-3 h-3" /> Paid</span>
+                  )}
+                </div>
                 {appt.notes && <p className="text-sm mt-2 p-3 bg-muted/30 rounded-xl border border-border/50 italic">"{appt.notes}"</p>}
+                {appt.consultationType === 'online' && appt.meetingLink && (
+                  <a href={appt.meetingLink} target="_blank" rel="noopener noreferrer" className="text-sm text-primary font-semibold flex items-center gap-1.5 mt-2 hover:underline">
+                    <Video className="w-4 h-4" /> Start Video Call <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
               <div className="flex gap-2">
                 {appt.status === 'pending' && <Button onClick={() => handleUpdateStatus(appt.id, 'booked')} className="rounded-xl bg-emerald-600 hover:bg-emerald-700">Accept</Button>}
                 {appt.status === 'booked' && <Button onClick={() => handleUpdateStatus(appt.id, 'completed')} className="rounded-xl" variant="outline">Mark Complete</Button>}
                 <Button variant="destructive" size="sm" className="rounded-xl" onClick={() => handleUpdateStatus(appt.id, 'cancelled')}>Cancel</Button>
               </div>
+          </div>
+        ))}
+      </TabsContent>
+
+      <TabsContent value="reviews" className="space-y-4">
+        <h3 className="font-bold text-xl mb-4">Patient Reviews</h3>
+        {(!reviewsData?.reviews || reviewsData.reviews.length === 0) && (
+          <div className="text-center py-16 bg-muted/20 rounded-3xl border border-dashed"><p className="text-muted-foreground">No reviews yet.</p></div>
+        )}
+        {reviewsData?.reviews?.map(review => (
+          <div key={review.id} className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm">
+                  {review.patientFirstName?.[0]}{review.patientLastName?.[0]}
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">{review.patientFirstName} {review.patientLastName}</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(review.createdAt), 'MMM d, yyyy')}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center bg-amber-50 px-2.5 py-1 rounded-lg">
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 mr-1" />
+                  <span className="font-bold text-sm text-amber-700">{review.rating}</span>
+                </div>
+              </div>
+            </div>
+            {review.comment && <p className="text-muted-foreground italic mb-3">"{review.comment}"</p>}
+            {review.doctorReply ? (
+              <div className="ml-6 p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <MessageSquare className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-bold text-primary">Your Reply</span>
+                  {review.doctorReplyAt && <span className="text-xs text-muted-foreground">{format(new Date(review.doctorReplyAt), 'MMM d, yyyy')}</span>}
+                </div>
+                <p className="text-sm text-foreground">{review.doctorReply}</p>
+              </div>
+            ) : (
+              <ReplyToReviewDialog reviewId={review.id} patientName={`${review.patientFirstName ?? ''} ${review.patientLastName ?? ''}`} onSuccess={() => refetchReviews()} />
+            )}
           </div>
         ))}
       </TabsContent>

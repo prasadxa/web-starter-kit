@@ -41,6 +41,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 
 - **Doctor Ranking Algorithm**: `score = rating × 0.6 + log(reviews) × 0.3 + (hasAvailability ? 0.1 : 0)`
 - **"Top Rated" Badge**: Gold award icon for doctors with rating ≥ 4.5 AND totalReviews ≥ 10
+- **"Most Booked" Badge**: Blue trending icon for doctors with totalReviews ≥ 25
 - **Double-booking Prevention**: Unique constraint on `(doctorId, date, timeSlot)` + runtime 409 check
 - **Role-based Dashboards**: patient / doctor / hospital_admin / super_admin
 - **Appointment Lifecycle**: pending → booked → completed/cancelled
@@ -51,7 +52,11 @@ Built as a pnpm workspace monorepo using TypeScript.
 - **Medical Records (EHR)**: CRUD for medical records — patients can self-create, doctors/admins manage
 - **In-app Notifications**: Real-time notification bell with unread count, mark-read support
 - **Enhanced Analytics**: Revenue charts, appointment trends, top doctors/departments (Recharts)
-- **Video Consultations**: consultation_type field and meeting_link on appointments
+- **Video Consultations**: consultation_type (online/offline) selection in booking, meeting_link display on dashboards
+- **Consultation Type Booking**: Online (video call) or Offline (in-person) selectable during booking
+- **Payment UI**: "Book & Pay" button in booking flow, payment status badges on dashboard
+- **Doctor Review Replies**: Doctors can reply to patient reviews from their dashboard
+- **Dashboard Badges**: Consultation type, payment status, and meeting link badges on appointment cards
 
 ## Database Schema
 
@@ -90,9 +95,9 @@ Replit OIDC → `/api/login` → Replit OAuth → `/api/callback` → session co
 
 - `/` — Hero + Browse by Specialty + Top Rated Doctors + Hospital Map
 - `/doctors` — Searchable/filterable doctor listing with sidebar filters
-- `/doctors/:id` — Doctor profile (bio, qualifications, reviews with doctor replies, verified badges)
-- `/doctors/:id/book` — Appointment booking (date picker → time slots → confirm)
-- `/dashboard` — Role-based dashboard (patient / doctor / hospital_admin / super_admin)
+- `/doctors/:id` — Doctor profile (bio, qualifications, reviews with verified badges + doctor replies, Top Rated/Most Booked badges)
+- `/doctors/:id/book` — Appointment booking (consultation type → date → time → notes → Book & Pay)
+- `/dashboard` — Role-based dashboard with consultation type/payment badges, meeting links, doctor review replies
 - `/symptom-checker` — AI-powered symptom analysis with department recommendations
 - `/medical-records` — EHR management (view/create medical records)
 - `/analytics` — Enhanced analytics dashboard with Recharts (trends, revenue, top docs/depts)
