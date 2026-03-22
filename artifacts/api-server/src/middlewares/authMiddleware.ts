@@ -75,6 +75,12 @@ export async function authMiddleware(
     return;
   }
 
+  if (session.access_token === "local") {
+    req.user = session.user;
+    next();
+    return;
+  }
+
   const refreshed = await refreshIfExpired(sid, session);
   if (!refreshed) {
     await clearSession(res, sid);

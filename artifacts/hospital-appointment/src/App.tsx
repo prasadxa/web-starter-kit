@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import MedicalRecords from "./pages/MedicalRecords";
 import Analytics from "./pages/Analytics";
 import SymptomCheckerPage from "./pages/SymptomCheckerPage";
+import SignIn from "./pages/SignIn";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/medical-records" component={MedicalRecords} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/symptom-checker" component={SymptomCheckerPage} />
+      <Route path="/sign-in" component={SignIn} />
       <Route component={NotFound} />
     </Switch>
   );

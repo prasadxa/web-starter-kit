@@ -7,6 +7,8 @@ import {
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
+import { eq, or } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import {
   clearSession,
   getOidcConfig,
@@ -20,6 +22,52 @@ import {
 } from "../lib/auth";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
+
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000;
+
+function checkRateLimit(identifier: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const record = loginAttempts.get(identifier);
+
+  if (!record) return { allowed: true };
+
+  if (now - record.lastAttempt > LOCKOUT_DURATION) {
+    loginAttempts.delete(identifier);
+    return { allowed: true };
+  }
+
+  if (record.count >= MAX_LOGIN_ATTEMPTS) {
+    const retryAfter = Math.ceil((LOCKOUT_DURATION - (now - record.lastAttempt)) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  return { allowed: true };
+}
+
+function recordFailedAttempt(identifier: string) {
+  const now = Date.now();
+  const record = loginAttempts.get(identifier);
+  if (record) {
+    record.count += 1;
+    record.lastAttempt = now;
+  } else {
+    loginAttempts.set(identifier, { count: 1, lastAttempt: now });
+  }
+}
+
+function clearFailedAttempts(identifier: string) {
+  loginAttempts.delete(identifier);
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/[\s\-\(\)]/g, "").trim();
+}
 
 const router: IRouter = Router();
 
@@ -88,6 +136,158 @@ async function upsertUser(claims: Record<string, unknown>) {
   return user;
 }
 
+router.post("/auth/register", async (req: Request, res: Response) => {
+  try {
+    const { email: rawEmail, phone: rawPhone, password, firstName, lastName } = req.body;
+
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
+    }
+
+    if (!rawEmail && !rawPhone) {
+      res.status(400).json({ error: "Email or phone number is required" });
+      return;
+    }
+
+    const email = rawEmail ? normalizeEmail(rawEmail) : null;
+    const phone = rawPhone ? normalizePhone(rawPhone) : null;
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({ error: "Invalid email format" });
+        return;
+      }
+    }
+
+    if (phone) {
+      const phoneClean = phone.replace(/\+/g, "");
+      if (phoneClean.length < 7 || phoneClean.length > 15 || !/^\+?\d+$/.test(phone)) {
+        res.status(400).json({ error: "Invalid phone number format" });
+        return;
+      }
+    }
+
+    const conditions = [];
+    if (email) conditions.push(eq(usersTable.email, email));
+    if (phone) conditions.push(eq(usersTable.phone, phone));
+
+    const existing = await db
+      .select()
+      .from(usersTable)
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions));
+
+    if (existing.length > 0) {
+      res.status(409).json({ error: "An account with this email or phone already exists" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const [newUser] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        phone,
+        passwordHash,
+        firstName: firstName?.trim() || null,
+        lastName: lastName?.trim() || null,
+      })
+      .returning();
+
+    const sessionData: SessionData = {
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        profileImageUrl: newUser.profileImageUrl,
+        role: newUser.role,
+        hospitalId: newUser.hospitalId ?? null,
+        doctorId: newUser.doctorId ?? null,
+      },
+      access_token: "local",
+    };
+
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+    res.json({ user: sessionData.user });
+  } catch (err: any) {
+    req.log.error({ err }, "Registration error");
+    res.status(500).json({ error: "Registration failed. Please try again." });
+  }
+});
+
+router.post("/auth/login", async (req: Request, res: Response) => {
+  try {
+    const { emailOrPhone: rawEmailOrPhone, password } = req.body;
+
+    if (!rawEmailOrPhone || !password) {
+      res.status(400).json({ error: "Email/phone and password are required" });
+      return;
+    }
+
+    const isEmail = rawEmailOrPhone.includes("@");
+    const emailOrPhone = isEmail
+      ? normalizeEmail(rawEmailOrPhone)
+      : normalizePhone(rawEmailOrPhone);
+
+    const rateCheck = checkRateLimit(emailOrPhone);
+    if (!rateCheck.allowed) {
+      res.status(429).json({
+        error: `Too many login attempts. Please try again in ${Math.ceil(rateCheck.retryAfter! / 60)} minutes.`,
+      });
+      return;
+    }
+
+    const condition = isEmail
+      ? eq(usersTable.email, emailOrPhone)
+      : eq(usersTable.phone, emailOrPhone);
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(condition);
+
+    if (!user || !user.passwordHash) {
+      recordFailedAttempt(emailOrPhone);
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) {
+      recordFailedAttempt(emailOrPhone);
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+
+    clearFailedAttempts(emailOrPhone);
+
+    const sessionData: SessionData = {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+        role: user.role,
+        hospitalId: user.hospitalId ?? null,
+        doctorId: user.doctorId ?? null,
+      },
+      access_token: "local",
+    };
+
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+    res.json({ user: sessionData.user });
+  } catch (err: any) {
+    req.log.error({ err }, "Login error");
+    res.status(500).json({ error: "Login failed. Please try again." });
+  }
+});
+
 router.get("/auth/user", (req: Request, res: Response) => {
   res.json(
     GetCurrentAuthUserResponse.parse({
@@ -105,9 +305,7 @@ router.get("/auth/me", (req: Request, res: Response) => {
 });
 
 router.get("/register", async (req: Request, res: Response) => {
-  const returnTo = req.query.returnTo;
-  const params = returnTo ? `?returnTo=${encodeURIComponent(String(returnTo))}` : "";
-  res.redirect(`/api/login${params}`);
+  res.redirect("/sign-in");
 });
 
 router.get("/login", async (req: Request, res: Response) => {
@@ -211,18 +409,15 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
   const sid = getSessionId(req);
   await clearSession(res, sid);
+  res.redirect("/");
+});
 
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
-
-  res.redirect(endSessionUrl.href);
+router.post("/auth/logout", async (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+  res.json({ success: true });
 });
 
 router.post(

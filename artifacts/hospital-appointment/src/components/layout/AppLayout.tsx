@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
-import { HeartPulse, LayoutDashboard, LogOut, FileText, Brain, BarChart3 } from "lucide-react";
+import { HeartPulse, LayoutDashboard, LogOut, FileText, Brain, BarChart3, Loader2 } from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -12,7 +12,7 @@ import {
 import NotificationBell from "@/components/NotificationBell";
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated, login, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
   const [location] = useLocation();
 
   return (
@@ -50,7 +50,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </nav>
           
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : isAuthenticated ? (
               <>
                 <NotificationBell />
                 <DropdownMenu>

@@ -13,7 +13,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 - **Package manager**: pnpm
 - **Frontend**: React 18 + Vite + TailwindCSS v4 + shadcn/ui + React Query + Recharts + Leaflet
 - **Backend**: Express 5 + PostgreSQL + Drizzle ORM + OpenAI (via Replit AI Integration) + Stripe (optional)
-- **Auth**: Replit OIDC (openid-client), session-based (cookie)
+- **Auth**: Custom email/phone + password (bcryptjs), session-based (cookie). Replit OIDC kept as fallback.
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec in `lib/api-spec/openapi.yaml`)
 - **Build**: esbuild (API server bundle)
@@ -93,6 +93,7 @@ Replit OIDC → `/api/login` → Replit OAuth → `/api/callback` → session co
 
 ## Frontend Pages
 
+- `/sign-in` — Sign In / Create Account page (email or phone + password, with toggle)
 - `/` — Hero + Browse by Specialty + Top Rated Doctors + Hospital Map
 - `/doctors` — Searchable/filterable doctor listing with sidebar filters (search, specialty, hospital, sort), "Find Nearby" geolocation, and toggleable hospital map
 - `/doctors/:id` — Doctor profile (bio, qualifications, reviews with verified badges + doctor replies, Top Rated/Most Booked badges)
