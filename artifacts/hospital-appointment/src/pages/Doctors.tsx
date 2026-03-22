@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Stethoscope } from "lucide-react";
+import { Search, Filter, Stethoscope, MapPin, LocateFixed } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DoctorCard } from "@/components/DoctorCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
-import { useGetDoctors, useGetDepartments } from "@workspace/api-client-react";
+import { useGetDoctors, useGetDepartments, useGetHospitals } from "@workspace/api-client-react";
+import HospitalMap, { getDistanceKm } from "@/components/HospitalMap";
 
 export default function Doctors() {
   const [searchParams, setSearchParams] = useState<URLSearchParams | null>(null);
@@ -22,7 +24,12 @@ export default function Doctors() {
 
   const [search, setSearch] = useState(initialSearch);
   const [departmentId, setDepartmentId] = useState<string>(initialDept);
+  const [hospitalId, setHospitalId] = useState<string>("all");
   const [sort, setSort] = useState<"score" | "rating" | "reviews" | "availability">("score");
+  const [showMap, setShowMap] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locatingUser, setLocatingUser] = useState(false);
+  const [selectedMapHospital, setSelectedMapHospital] = useState<number | null>(null);
 
   useEffect(() => {
     if (searchParams) {
@@ -32,12 +39,61 @@ export default function Doctors() {
   }, [searchParams]);
 
   const { data: departments } = useGetDepartments();
+  const { data: hospitals } = useGetHospitals();
   const { data: doctorsData, isLoading } = useGetDoctors({
     search: search.length > 0 ? search : undefined,
     departmentId: departmentId !== "all" ? parseInt(departmentId) : undefined,
+    hospitalId: hospitalId !== "all" ? parseInt(hospitalId) : undefined,
     sort,
     limit: 20
   });
+
+  const handleFindNearby = () => {
+    if (userLocation) {
+      setUserLocation(null);
+      setHospitalId("all");
+      return;
+    }
+
+    setLocatingUser(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setLocatingUser(false);
+
+        if (hospitals && hospitals.length > 0) {
+          const validHospitals = hospitals.filter((h: any) => h.latitude && h.longitude);
+          if (validHospitals.length > 0) {
+            let nearest = validHospitals[0] as any;
+            let nearestDist = getDistanceKm(loc.lat, loc.lng, nearest.latitude, nearest.longitude);
+            for (const h of validHospitals as any[]) {
+              const d = getDistanceKm(loc.lat, loc.lng, h.latitude, h.longitude);
+              if (d < nearestDist) {
+                nearest = h;
+                nearestDist = d;
+              }
+            }
+            setHospitalId(nearest.id.toString());
+            setSelectedMapHospital(nearest.id);
+            setShowMap(true);
+          }
+        }
+      },
+      () => {
+        setLocatingUser(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const hospitalsForMap = (hospitals || []).map((h: any) => ({
+    id: h.id,
+    name: h.name,
+    location: h.location || "",
+    latitude: h.latitude,
+    longitude: h.longitude,
+  }));
 
   return (
     <AppLayout>
@@ -51,8 +107,7 @@ export default function Doctors() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
-        {/* Sidebar Filters */}
-        <div className="w-full md:w-64 shrink-0 space-y-8">
+        <div className="w-full md:w-64 shrink-0 space-y-6">
           <div className="bg-card border border-border/60 rounded-3xl p-6 shadow-sm">
             <div className="flex items-center gap-2 font-bold text-lg mb-6 pb-4 border-b border-border/50">
               <Filter className="w-5 h-5 text-primary" />
@@ -89,6 +144,23 @@ export default function Doctors() {
               </div>
 
               <div className="space-y-3">
+                <Label className="text-sm font-semibold text-muted-foreground">Hospital</Label>
+                <Select value={hospitalId} onValueChange={(v) => { setHospitalId(v); setSelectedMapHospital(v !== "all" ? parseInt(v) : null); }}>
+                  <SelectTrigger className="w-full rounded-xl bg-background border-border/60">
+                    <SelectValue placeholder="All Hospitals" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Hospitals</SelectItem>
+                    {hospitals?.map((h: any) => (
+                      <SelectItem key={h.id} value={h.id.toString()}>
+                        {h.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
                 <Label className="text-sm font-semibold text-muted-foreground">Sort By</Label>
                 <Select value={sort} onValueChange={(v) => setSort(v as "score" | "rating" | "reviews" | "availability")}>
                   <SelectTrigger className="w-full rounded-xl bg-background border-border/60">
@@ -102,16 +174,63 @@ export default function Doctors() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="pt-2 space-y-2">
+                <Button
+                  variant={userLocation ? "default" : "outline"}
+                  className="w-full rounded-xl gap-2"
+                  onClick={handleFindNearby}
+                  disabled={locatingUser}
+                >
+                  <LocateFixed className={`h-4 w-4 ${locatingUser ? 'animate-pulse' : ''}`} />
+                  {locatingUser ? "Finding..." : userLocation ? "Nearby Active" : "Find Nearby"}
+                </Button>
+
+                <Button
+                  variant={showMap ? "default" : "outline"}
+                  className="w-full rounded-xl gap-2"
+                  onClick={() => setShowMap(!showMap)}
+                >
+                  <MapPin className="h-4 w-4" />
+                  {showMap ? "Hide Map" : "Show Map"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Results Grid */}
         <div className="flex-1 min-w-0">
-          <div className="mb-6 flex items-center justify-between">
+          {showMap && hospitalsForMap.length > 0 && (
+            <div className="mb-8">
+              <HospitalMap 
+                hospitals={hospitalsForMap}
+                selectedHospitalId={selectedMapHospital}
+                onSelectHospital={(id) => {
+                  setSelectedMapHospital(id);
+                  if (id) {
+                    setHospitalId(id.toString());
+                  } else {
+                    setHospitalId("all");
+                  }
+                }}
+                showHospitalCards={false}
+                height="300px"
+                userLocation={userLocation}
+              />
+            </div>
+          )}
+
+          <div className="mb-6 flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xl font-bold text-foreground">
               {isLoading ? "Searching..." : `${doctorsData?.total || 0} Doctors Available`}
             </h2>
+            {hospitalId !== "all" && (
+              <Badge variant="secondary" className="gap-1">
+                <MapPin className="h-3 w-3" />
+                {hospitals?.find((h: any) => h.id.toString() === hospitalId)?.name || "Selected Hospital"}
+                <button className="ml-1 hover:text-destructive" onClick={() => { setHospitalId("all"); setSelectedMapHospital(null); }}>&times;</button>
+              </Badge>
+            )}
           </div>
 
           {isLoading ? (
@@ -138,7 +257,7 @@ export default function Doctors() {
               <Button 
                 variant="outline" 
                 className="mt-6 rounded-xl"
-                onClick={() => { setSearch(""); setDepartmentId("all"); setSort("score"); }}
+                onClick={() => { setSearch(""); setDepartmentId("all"); setHospitalId("all"); setSort("score"); setSelectedMapHospital(null); setUserLocation(null); }}
               >
                 Clear all filters
               </Button>

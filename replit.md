@@ -94,7 +94,7 @@ Replit OIDC → `/api/login` → Replit OAuth → `/api/callback` → session co
 ## Frontend Pages
 
 - `/` — Hero + Browse by Specialty + Top Rated Doctors + Hospital Map
-- `/doctors` — Searchable/filterable doctor listing with sidebar filters
+- `/doctors` — Searchable/filterable doctor listing with sidebar filters (search, specialty, hospital, sort), "Find Nearby" geolocation, and toggleable hospital map
 - `/doctors/:id` — Doctor profile (bio, qualifications, reviews with verified badges + doctor replies, Top Rated/Most Booked badges)
 - `/doctors/:id/book` — Appointment booking (consultation type → date → time → notes → Book & Pay)
 - `/dashboard` — Role-based dashboard with consultation type/payment badges, meeting links, doctor review replies
