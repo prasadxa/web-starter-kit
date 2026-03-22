@@ -20,6 +20,7 @@ export const appointmentsTable = pgTable("appointments", {
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("pending"),
   paymentId: text("payment_id"),
   stripeSessionId: text("stripe_session_id"),
+  cashfreeOrderId: text("cashfree_order_id"),
   consultationType: consultationTypeEnum("consultation_type").notNull().default("offline"),
   meetingLink: text("meeting_link"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
