@@ -13,7 +13,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 - **Package manager**: pnpm
 - **Frontend**: React 18 + Vite + TailwindCSS v4 + shadcn/ui + React Query + Recharts + Leaflet
 - **Backend**: Express 5 + PostgreSQL + Drizzle ORM + OpenAI (via Replit AI Integration) + Stripe (optional)
-- **Auth**: Custom email/phone + password (bcryptjs), session-based (cookie). Replit OIDC kept as fallback.
+- **Auth**: Custom email/phone + password (bcryptjs), OTP-based verification (6-digit), session-based (cookie). Replit OIDC kept as fallback.
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec in `lib/api-spec/openapi.yaml`)
 - **Build**: esbuild (API server bundle)
@@ -60,7 +60,7 @@ Built as a pnpm workspace monorepo using TypeScript.
 
 ## Database Schema
 
-- `users` (from replit auth) — id (replitUserId), role, hospitalId, doctorId
+- `users` (from replit auth) — id (replitUserId), role, hospitalId, doctorId, emailVerified, phoneVerified
 - `hospitals` — name, location, approved, latitude, longitude
 - `departments` — name, description, icon
 - `doctors` — userId (FK→users), hospitalId, departmentId, firstName, lastName, experience, consultationFee, averageRating, totalReviews, bio, specialization, qualification
@@ -85,11 +85,16 @@ Built as a pnpm workspace monorepo using TypeScript.
 - `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`
 - `GET/POST /medical-records`
 - `POST /payments/create-order`, `GET /payments/callback`, `POST /payments/verify`, `POST /payments/webhook`
+- `POST /auth/otp/send` (send 6-digit OTP for register or forgot-password)
+- `POST /auth/otp/verify` (verify OTP)
+- `POST /auth/register` (requires OTP verification first)
+- `POST /auth/login`, `POST /auth/logout`
+- `POST /auth/forgot-password` (sends OTP), `POST /auth/reset-password` (OTP + new password)
 - `GET /auth/user`, `GET /auth/login`, `GET /auth/callback`, `GET /auth/logout`
 
 ## Auth Flow
 
-Replit OIDC → `/api/login` → Replit OAuth → `/api/callback` → session cookie. `useAuth()` hook in frontend reads `/api/auth/user` to check session.
+Custom auth: Register → Send OTP to email/phone → Verify 6-digit OTP → Create account. Forgot Password → Send OTP → Verify → Set new password. OTPs shown on screen in demo mode (no SMS/email service). In production, integrate Twilio/SendGrid. Replit OIDC kept as fallback.
 
 ## Frontend Pages
 
