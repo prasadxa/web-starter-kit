@@ -49,7 +49,6 @@ export default function HospitalMap({
     if (!mapRef.current) return;
 
     const validHospitals = hospitals.filter(h => h.latitude && h.longitude);
-    if (validHospitals.length === 0) return;
 
     const loadMap = async () => {
       const L = await import("leaflet");
@@ -59,13 +58,19 @@ export default function HospitalMap({
         mapInstanceRef.current.remove();
       }
 
+      // Default to India center if no valid hospitals
+      const initialCenter: [number, number] = validHospitals.length > 0 
+        ? [validHospitals[0].latitude!, validHospitals[0].longitude!]
+        : [20.5937, 78.9629]; // Coordinates for India
+        
+      const initialZoom = validHospitals.length > 0 
+        ? (validHospitals.length === 1 ? 13 : 5)
+        : 5;
+
       const map = L.map(mapRef.current!, {
         scrollWheelZoom: false,
         zoomControl: true,
-      }).setView(
-        [validHospitals[0].latitude!, validHospitals[0].longitude!],
-        validHospitals.length === 1 ? 13 : 5
-      );
+      }).setView(initialCenter, initialZoom);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>',
